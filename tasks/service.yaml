@@ -1,0 +1,17 @@
+---
+- name: SERVICE | Enable the netfilter-persistent service
+  ansible.builtin.service:
+    name: netfilter-persistent
+    enabled: true
+
+- name: SERVICE | Start the IPv4 IPtables service
+  ansible.builtin.service:
+    name: iptables
+    state: started
+    enabled: true
+
+- name: SERVICE | Start the IPv6 IPtables service
+  ansible.builtin.service:
+    name: ip6tables
+    state: started
+    enabled: true

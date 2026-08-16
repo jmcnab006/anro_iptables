@@ -1,0 +1,15 @@
+{% for ipset in anro_iptables_ipset_sets -%}
+# ----------------------------------------
+# ipset {{ ipset.name }}
+# ----------------------------------------
+# Recreate the ipset if needed, and flush all entries
+create -exist {{ ipset.name }} {{ ipset.type | default('hash:net') }} family {{ ipset.family | default('inet') }} hashsize {{ ipset.hashsize | default(anro_iptables_ipset_hashsize)}} maxelem {{ ipset.maxelem | default(anro_iptables_ipset_maxelem)}}
+{% if anro_iptables_ipset_bucketsize is defined %}
+bucketsize {{ ipset.bucketsize | default(anro_iptables_ipset_bucketsize)}}
+{% endif %}
+{% set raw_set = ipset.set if ipset.set is iterable and ipset.set is not string else [ipset.set] %}
+{% set flat_set = raw_set | flatten %}
+{% for server in flat_set -%}
+add {{ ipset.name }} {{ server }}
+{% endfor %}
+{% endfor %}

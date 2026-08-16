@@ -1,0 +1,32 @@
+---
+- name: CONFIGURE | Create config directory /etc/iptables
+  ansible.builtin.file:
+    path: /etc/iptables
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: CONFIGURE | Create IPv4 rules
+  ansible.builtin.template:
+    src: etc/iptables/rules.v4.j2
+    dest: /etc/iptables/rules.v4
+    validate: "{{ anro_iptables_ipv4_command }} --test %s"
+    mode: '0644'
+  become: true
+  notify:
+    - Restart iptables
+    - Reload ipv4
+    - Restart docker anro_iptables
+
+- name: CONFIGURE | Create IPv6 rules
+  ansible.builtin.template:
+    src: etc/iptables/rules.v6.j2
+    dest: /etc/iptables/rules.v6
+    validate: "{{ anro_iptables_ipv6_command }} --test %s"
+    mode: '0644'
+  become: true
+  notify:
+    - Restart ip6tables
+    - Reload ipv6
+    - Restart docker anro_iptables

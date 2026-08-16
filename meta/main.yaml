@@ -1,0 +1,22 @@
+---
+galaxy_info:
+  author: jmcnab
+  namespace: jmcnab006
+  role_name: anro_iptables
+  description: Install and configure iptables and ipsets on your system.
+  license: GNU
+  min_ansible_version: "2.12"
+
+  platforms:
+    - name: Ubuntu
+      versions:
+        - all
+    - name: Debian
+      versions:
+        - all
+
+  galaxy_tags:
+    - iptables
+    - networking
+
+dependencies: []

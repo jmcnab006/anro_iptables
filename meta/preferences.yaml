@@ -1,0 +1,5 @@
+---
+matrix_overrides:
+  ubuntu:
+    python:
+      - python:3.10

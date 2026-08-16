@@ -1,0 +1,128 @@
+---
+argument_specs:
+  main:
+    short_description: 'Install and configure iptables and optionally ipsets on your system.'
+    description: >
+      Install and configure iptables on your system.
+    author: Jeremy McNab
+    options:
+      anro_iptables_debug:
+        type: 'bool'
+        default: false
+        description: 'Enable additional output on the console'
+      anro_iptables_ipv4_command:
+        type: 'str'
+        default: '/usr/sbin/iptables-restore'
+        description: 'Command path for iptables ipv4 command'
+      anro_iptables_ipv6_command:
+        type: 'str'
+        default: '/usr/sbin/ip6tables-restore'
+        description: 'Command path for iptables ipv6 command'
+      anro_iptables_ipset_command:
+        type: 'str'
+        default: '/usr/sbin/ipset'
+        description: 'Command path for ipset'
+      anro_iptables_ipv4_rules1:
+        type: 'list'
+        default: []
+        description: 'First list element for ipv4 rules definitions'
+      anro_iptables_ipv4_rules6:
+        type: 'list'
+        default: []
+        description: 'Last list element for ipv4 rules definitions'
+      anro_iptables_ipv6_rules1:
+        type: 'list'
+        default: []
+        description: 'First list element for ipv6 rules definitions'
+      anro_iptables_ipv6_rules6:
+        type: 'list'
+        default: []
+        description: 'Last list element for ipv6 rules definitions'
+      anro_iptables_ipv4_rules:
+        type: 'list'
+        default: []
+        description: 'Full list of ipv4 rules'
+      anro_iptables_ipv6_rules:
+        type: 'list'
+        default: []
+        description: 'Full list of ipv6 rules'
+      anro_iptables_host_groups:
+        type: 'list'
+        default: []
+        description: 'List of dict elements defining a host group'
+      anro_iptables_ipset_enabled:
+        type: 'bool'
+        default: false
+        description: 'Install and configure IPSet or not'
+      anro_iptables_ipset_hashsize:
+        type: 'int'
+        default: 1024
+        description: 'IPSet hashsize'
+      anro_iptables_ipset_maxelem:
+        type: 'int'
+        default: 65536
+        description: 'IPSet max element'
+      anro_iptables_ipset_bucketsize:
+        type: 'int'
+        default: 12
+        description: 'IPSet bucket size'
+      anro_iptables_ipset_family:
+        type: 'str'
+        default: 'inet'
+        description: 'IPSet family'
+      anro_iptables_ipset_type:
+        type: 'str'
+        default: 'hash:net'
+        description: 'IPSet type'
+      anro_iptables_ipset_config_dir:
+        type: 'str'
+        default: '/etc/iptables'
+        description: 'IPset configuration file directory'
+      anro_iptables_ipset_save_file:
+        type: 'str'
+        default: 'ipsets'
+        description: 'IPSet default save file name'
+      anro_iptables_ipsets:
+        type: 'list'
+        default: []
+        description: 'IPSet list of defined ipsets'
+      anro_iptables_interfaces:
+        type: 'list'
+        default: []
+        description: 'A list of interfaces to be used in rules'
+      anro_iptables_ansible_host_groups:
+        type: 'list'
+        default: []
+        description: 'A list of Ansible group names to include in the template'
+      anro_iptables_ansible_host_groups_ipv4_hostvar:
+        type: 'str'
+        default: 'ipv4'
+        description: 'The host variable which contains the host IPv4 address'
+      anro_iptables_ansible_host_groups_ipv6_hostvar:
+        type: 'str'
+        default: 'ipv6'
+        description: 'The host variable which contains the host IPv6 address'
+      anro_iptables_docker_enabled:
+        type: 'bool'
+        default: false
+        description: 'Flag to enable docker functionality iptables rules'
+      anro_iptables_docker_ipv4_subnets:
+        type: 'list'
+        default: ['172.17.0.0/16']
+        description: "Default IPv4 subnets used by Docker"
+      anro_iptables_docker_ipv6_subnets:
+        type: 'list'
+        default: ['fd00::/80']
+        description: "Default IPv6 subnets used by Docker"
+      anro_iptables_input_policy:
+        type: 'str'
+        default: 'accept'
+        description: "Iptables INPUT chain policy"
+      anro_iptables_forward_policy:
+        type: 'str'
+        default: 'accept'
+        description: "Iptables FORWARD chain policy"
+      anro_iptables_output_policy:
+        type: 'str'
+        default: 'accept'
+        description: "Iptables OUTPUT chain policy"

@@ -1,0 +1,58 @@
+---
+- name: Check if Docker service is enabled
+  ansible.builtin.service_facts:
+
+- name: Set facts about Docker service status
+  ansible.builtin.set_fact:
+    _docker_installed: "{{
+      ansible_facts.services['docker.service'] is defined and
+      ansible_facts.services['docker.service']['status'] == 'enabled'
+    }}"
+  when: "'docker.service' in ansible_facts.services"
+
+- name: Ensure FORWARD chain is set to ACCEPT if docker is enabled
+  ansible.builtin.set_fact:
+    anro_iptables_forward_policy: accept
+  when:
+    - _docker_installed is defined
+    - _docker_installed | bool
+    - anro_iptables_docker_enabled | bool
+
+- name: Install packages
+  ansible.builtin.import_tasks: install.yaml
+  tags:
+    - iptables
+    - iptables-install
+
+# Do our install and ipset configuration before our iptables rules and then flush handler, otherwise iptables will error with no ipset defined
+
+- name: Configure IPset
+  when:
+    - anro_iptables_ipset_enabled is defined
+    - anro_iptables_ipset_enabled
+  ansible.builtin.import_tasks: ipset.yaml
+  tags:
+    - iptables
+    - iptables-ipset
+
+- name: Configure IPtables
+  ansible.builtin.import_tasks: configure.yaml
+  tags:
+    - iptables
+    - iptables-configure
+
+- name: Start and enable services
+  ansible.builtin.import_tasks: service.yaml
+  tags:
+    - iptables
+    - iptables-service
+
+- name: Enable Disable gateway features
+  ansible.builtin.import_tasks: gateway.yaml
+  tags:
+    - gateway
+
+- name: Flush handlers
+  ansible.builtin.meta: flush_handlers
+  tags:
+    - always

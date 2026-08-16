@@ -1,0 +1,15 @@
+---
+- name: IPSET | Create IPsets
+  ansible.builtin.template:
+    src: etc/iptables/ipsets.j2
+    dest: /etc/iptables/ipsets
+    mode: '0644'
+  become: true
+  notify:
+    - IPset flush
+    - IPset restore
+    - Restart ip6tables
+    - Restart iptables
+
+- name: Flush handlers
+  ansible.builtin.meta: flush_handlers

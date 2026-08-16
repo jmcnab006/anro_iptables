@@ -1,0 +1,101 @@
+---
+- name: All host variables
+  hosts: all
+  become: true
+  vars:
+    anro_iptables_input_policy: drop
+    anro_iptables_forward_policy: drop
+    anro_iptables_output_policy: accept
+
+    anro_iptables_ipv4_rules1:
+      - -A INPUT -m state --state RELATED,ESTABLISHED -j ACCEPT
+      - -A INPUT -i lo -m state --state NEW -j ACCEPT
+      - -A INPUT -p icmp -m limit --limit 100/sec -m state --state NEW -j ACCEPT
+
+    anro_iptables_ipv6_rules1:
+      - -A INPUT -i lo -j ACCEPT
+      - -A INPUT -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+      - -A INPUT -m conntrack --ctstate INVALID -j DROP
+      - -A INPUT -s ::1/128 ! -i lo -j DROP
+
+    anro_iptables_ipv6_rules6:
+      - -A INPUT -p ipv6-icmp -m icmp6 --icmpv6-type 1 -j ACCEPT
+      - -A INPUT -p ipv6-icmp -m icmp6 --icmpv6-type 2 -j ACCEPT
+      - -A INPUT -p ipv6-icmp -m icmp6 --icmpv6-type 3 -j ACCEPT
+      - -A INPUT -p ipv6-icmp -m icmp6 --icmpv6-type 4 -j ACCEPT
+      - -A INPUT -p ipv6-icmp -m icmp6 --icmpv6-type 128 -j ACCEPT
+      - -A INPUT -p ipv6-icmp -m icmp6 --icmpv6-type 129 -j ACCEPT
+      - -A INPUT -p ipv6-icmp -m icmp6 --icmpv6-type 133 -j ACCEPT
+      - -A INPUT -p ipv6-icmp -m icmp6 --icmpv6-type 134 -j ACCEPT
+      - -A INPUT -p ipv6-icmp -m icmp6 --icmpv6-type 135 -j ACCEPT
+      - -A INPUT -p ipv6-icmp -m icmp6 --icmpv6-type 136 -j ACCEPT
+      - -A INPUT -p ipv6-icmp -m icmp6 --icmpv6-type 137 -j ACCEPT
+      - -A INPUT -p ipv6-icmp -m icmp6 --icmpv6-type 141 -j ACCEPT
+      - -A INPUT -p ipv6-icmp -m icmp6 --icmpv6-type 142 -j ACCEPT
+      - -A INPUT -s fe80::/10 -p ipv6-icmp -m icmp6 --icmpv6-type 130 -j ACCEPT
+      - -A INPUT -s fe80::/10 -p ipv6-icmp -m icmp6 --icmpv6-type 131 -j ACCEPT
+      - -A INPUT -s fe80::/10 -p ipv6-icmp -m icmp6 --icmpv6-type 132 -j ACCEPT
+      - -A INPUT -s fe80::/10 -p ipv6-icmp -m icmp6 --icmpv6-type 143 -j ACCEPT
+      - -A INPUT -p ipv6-icmp -m icmp6 --icmpv6-type 148 -j ACCEPT
+      - -A INPUT -p ipv6-icmp -m icmp6 --icmpv6-type 149 -j ACCEPT
+      - -A INPUT -s fe80::/10 -p ipv6-icmp -m icmp6 --icmpv6-type 151 -j ACCEPT
+      - -A INPUT -s fe80::/10 -p ipv6-icmp -m icmp6 --icmpv6-type 152 -j ACCEPT
+      - -A INPUT -s fe80::/10 -p ipv6-icmp -m icmp6 --icmpv6-type 153 -j ACCEPT
+
+  roles:
+    - role: anro_iptables
+      vars:
+        anro_iptables_debug: true
+        anro_iptables_interfaces:
+          - eth0
+          - eth1
+        anro_iptables_host_groups:
+          - name: PRIVATE
+            ipv4:
+              - 172.16.31.50/24
+            ipv6:
+              - 2605:5400:0:33::/64
+          - name: PUBLIC
+            ipv4:
+              - 8.8.8.0/24
+
+        anro_iptables_ipset_enabled: true
+
+        anro_iptables_ipset_sets:
+          - name: PUBLIC
+            type: 'hash:net'
+            family: inet
+            bucketsize: 10
+            set:
+              - 8.8.8.0/24
+
+        anro_iptables_ipv4_rules2:
+          - -A INPUT -p tcp -m tcp --dport 22 -m state --state NEW -j PRIVATE
+          - -A INPUT -p tcp -m tcp --dport 22 -m state --state NEW -j PUBLIC
+          - "-A INPUT -i {{ iptables_interfaces[0] }} -p tcp -m tcp --dport 22 -m state --state NEW -j LEGACY"
+          - "-A INPUT -i {{ iptables_interfaces[1] }} -p tcp -m tcp --dport 22 -m state --state NEW -j LEGACY"
+
+        # IPSET example
+        anro_iptables_ipv4_rules3:
+          - >-
+            -A INPUT
+            -i {{ iptables_interfaces[1] }}
+            -p tcp -m tcp
+            --dport 22
+            -m state --state NEW
+            -m set --match-set PUBLIC src
+            -j ACCEPT
+          - >-
+            -A INPUT
+            -i {{ iptables_interfaces[0] }}
+            -p tcp -m tcp
+            --dport 22
+            -m state --state NEW
+            -m set --match-set {{ iptables_ipset_sets[0].name }} src
+            -j ACCEPT
+
+
+        anro_iptables_ipv6_rules2:
+          - -A INPUT -p udp -m udp --dport 161 -j PRIVATE
+          - -A INPUT -p tcp -m tcp --dport 3306 -m state --state NEW -j PRIVATE
+          - -A INPUT -p tcp -m tcp --dport 22 -m state --state NEW -j PRIVATE
