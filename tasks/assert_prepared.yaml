@@ -1,0 +1,62 @@
+---
+- name: ASSERT | Validate unique static chain names
+  ansible.builtin.assert:
+    that:
+      - >-
+        (anro_iptables_host_groups | map(attribute='name') | map('upper') | list | unique | length)
+        == (anro_iptables_host_groups | length)
+    fail_msg: Static host-group names must be unique after conversion to uppercase.
+
+
+- name: ASSERT | Validate unique inventory-derived chain names
+  ansible.builtin.assert:
+    that:
+      - >-
+        (anro_iptables_ansible_host_groups | map('upper') | list | unique | length)
+        == (anro_iptables_ansible_host_groups | length)
+    fail_msg: Inventory-derived host-group names must be unique after conversion to uppercase.
+
+- name: ASSERT | Prevent static and inventory-derived chain collisions
+  ansible.builtin.assert:
+    that:
+      - >-
+        ((anro_iptables_host_groups | map(attribute='name') | map('upper') | list)
+        | intersect(anro_iptables_ansible_host_groups | map('upper') | list) | length) == 0
+    fail_msg: >-
+      A chain name is present in both anro_iptables_host_groups and
+      anro_iptables_ansible_host_groups. Chain names must be unique.
+
+- name: ASSERT | Require IPSet when effective rules reference match-set
+  ansible.builtin.assert:
+    that:
+      - anro_iptables_ipset_enabled | bool
+    fail_msg: >-
+      One or more effective firewall rules reference '--match-set', but
+      anro_iptables_ipset_enabled is false.
+  when: >-
+    '--match-set' in (
+      [_anro_iptables_ipv4_filter_rules, _anro_iptables_ipv4_nat_rules,
+       _anro_iptables_ipv4_mangle_rules, _anro_iptables_ipv4_raw_rules,
+       _anro_iptables_ipv6_filter_rules, _anro_iptables_ipv6_nat_rules,
+       _anro_iptables_ipv6_mangle_rules, _anro_iptables_ipv6_raw_rules]
+      | flatten | join(' ')
+    )
+
+- name: ASSERT | Protect built-in filter chain names
+  ansible.builtin.assert:
+    that:
+      - >-
+        ((anro_iptables_host_groups | map(attribute='name') | map('upper') | list)
+        | intersect(['INPUT', 'FORWARD', 'OUTPUT']) | length) == 0
+      - >-
+        ((anro_iptables_ansible_host_groups | map('upper') | list)
+        | intersect(['INPUT', 'FORWARD', 'OUTPUT']) | length) == 0
+    fail_msg: Host-group chain names cannot be INPUT, FORWARD, or OUTPUT.
+
+- name: ASSERT | Protect Docker chain name
+  ansible.builtin.assert:
+    that:
+      - "'DOCKER-USER' not in (anro_iptables_host_groups | map(attribute='name') | map('upper') | list)"
+      - "'DOCKER-USER' not in (anro_iptables_ansible_host_groups | map('upper') | list)"
+    fail_msg: DOCKER-USER is reserved when Docker integration is enabled.
+  when: anro_iptables_docker_enabled | bool

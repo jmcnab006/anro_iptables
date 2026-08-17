@@ -1,69 +1,35 @@
 ---
-- name: Reload ipv4
-  register: _iptables_no_flush
+- name: Reload ipsets
   ansible.builtin.command:
-    cmd: "{{ anro_iptables_ipv4_command }} --noflush /etc/iptables/rules.v4"
-  changed_when: _iptables_no_flush.rc == 0
+    cmd: >-
+      {{ anro_iptables_ipset_command }} restore -exist -f
+      {{ anro_iptables_config_dir }}/{{ anro_iptables_ipset_save_file }}
+  register: _anro_iptables_ipset_restore
+  changed_when: _anro_iptables_ipset_restore.rc == 0
+
+- name: Reload ipv4
+  ansible.builtin.command:
+    cmd: >-
+      {{ anro_iptables_ipv4_command }}
+      {{ '--noflush' if anro_iptables_restore_noflush | bool else '' }}
+      {{ anro_iptables_config_dir }}/{{ anro_iptables_ipv4_save_file }}
+  register: _anro_iptables_ipv4_restore
+  changed_when: _anro_iptables_ipv4_restore.rc == 0
 
 - name: Reload ipv6
-  register: _ip6tables_no_flush
   ansible.builtin.command:
-    cmd: "{{ anro_iptables_ipv6_command }} --noflush /etc/iptables/rules.v6"
-  changed_when: _ip6tables_no_flush.rc == 0
+    cmd: >-
+      {{ anro_iptables_ipv6_command }}
+      {{ '--noflush' if anro_iptables_restore_noflush | bool else '' }}
+      {{ anro_iptables_config_dir }}/{{ anro_iptables_ipv6_save_file }}
+  register: _anro_iptables_ipv6_restore
+  changed_when: _anro_iptables_ipv6_restore.rc == 0
 
-- name: IPset flush
-  ansible.builtin.command:
-    cmd: ipset flush
-  register: _ipset_flush
-  until: _ipset_flush is succeeded
-  changed_when: _ipset_flush.rc == 0
-  retries: 5
-  delay: 2
-
-- name: IPset restore
-  ansible.builtin.command:
-    cmd: "{{ anro_iptables_ipset_command }} restore -f {{ anro_iptables_ipset_config_dir }}/{{ anro_iptables_ipset_save_file }}"
-  register: _ipset_restore
-  changed_when: _ipset_restore.rc == 0
-  until: _ipset_restore is succeeded
-  retries: 5
-  delay: 2
-
-- name: Restart iptables
-  ansible.builtin.systemd:
-    name: iptables
-    state: restarted
-  throttle: 1
-  register: _iptables_restart
-  until: _iptables_restart is succeeded
-  retries: 5
-  delay: 2
-
-- name: Restart ip6tables
-  ansible.builtin.systemd:
-    name: ip6tables
-    state: restarted
-  throttle: 1
-  register: _ip6tables_restart
-  until: _ip6tables_restart is succeeded
-  retries: 5
-  delay: 2
-
-- name: Apply sysctl
-  ansible.builtin.command: 'sysctl -p'
-  changed_when: false
-
-- name: Restart docker anro_iptables
+- name: Restart Docker after firewall change
   ansible.builtin.systemd:
     name: docker
     state: restarted
-  throttle: 1
-  register: _docker_restart
-  until: _docker_restart is succeeded
-  retries: 5
-  delay: 2
   when:
-    - anro_iptables_docker_enabled is defined
     - anro_iptables_docker_enabled | bool
-    - _docker_installed is defined
-    - _docker_installed | bool
+    - anro_iptables_docker_restart_on_change | bool
+    - _anro_iptables_docker_running | default(false) | bool

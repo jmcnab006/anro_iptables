@@ -1,0 +1,158 @@
+---
+- name: PREPARE | Assemble ipv4 filter rules
+  ansible.builtin.set_fact:
+    _anro_iptables_ipv4_filter_rules: >-
+      {{
+        anro_iptables_ipv4_rules0
+        + anro_iptables_ipv4_rules1
+        + anro_iptables_ipv4_rules2
+        + anro_iptables_ipv4_rules3
+        + anro_iptables_ipv4_rules4
+        + anro_iptables_ipv4_rules5
+        + anro_iptables_ipv4_rules6
+        + anro_iptables_ipv4_rules7
+        + anro_iptables_ipv4_rules8
+        + anro_iptables_ipv4_rules9
+        + anro_iptables_ipv4_rules
+        + anro_iptables_ipv4_filter_rules0
+        + anro_iptables_ipv4_filter_rules1
+        + anro_iptables_ipv4_filter_rules2
+        + anro_iptables_ipv4_filter_rules3
+        + anro_iptables_ipv4_filter_rules4
+        + anro_iptables_ipv4_filter_rules5
+        + anro_iptables_ipv4_filter_rules6
+        + anro_iptables_ipv4_filter_rules7
+        + anro_iptables_ipv4_filter_rules8
+        + anro_iptables_ipv4_filter_rules9
+        + anro_iptables_ipv4_filter_rules
+      }}
+
+- name: PREPARE | Assemble ipv4 nat rules
+  ansible.builtin.set_fact:
+    _anro_iptables_ipv4_nat_rules: >-
+      {{
+        anro_iptables_ipv4_nat_rules0
+        + anro_iptables_ipv4_nat_rules1
+        + anro_iptables_ipv4_nat_rules2
+        + anro_iptables_ipv4_nat_rules3
+        + anro_iptables_ipv4_nat_rules4
+        + anro_iptables_ipv4_nat_rules5
+        + anro_iptables_ipv4_nat_rules6
+        + anro_iptables_ipv4_nat_rules7
+        + anro_iptables_ipv4_nat_rules8
+        + anro_iptables_ipv4_nat_rules9
+        + anro_iptables_ipv4_nat_rules
+      }}
+
+- name: PREPARE | Assemble ipv4 mangle rules
+  ansible.builtin.set_fact:
+    _anro_iptables_ipv4_mangle_rules: >-
+      {{
+        anro_iptables_ipv4_mangle_rules0
+        + anro_iptables_ipv4_mangle_rules1
+        + anro_iptables_ipv4_mangle_rules2
+        + anro_iptables_ipv4_mangle_rules3
+        + anro_iptables_ipv4_mangle_rules4
+        + anro_iptables_ipv4_mangle_rules5
+        + anro_iptables_ipv4_mangle_rules6
+        + anro_iptables_ipv4_mangle_rules7
+        + anro_iptables_ipv4_mangle_rules8
+        + anro_iptables_ipv4_mangle_rules9
+        + anro_iptables_ipv4_mangle_rules
+      }}
+
+- name: PREPARE | Assemble ipv4 raw rules
+  ansible.builtin.set_fact:
+    _anro_iptables_ipv4_raw_rules: >-
+      {{
+        anro_iptables_ipv4_raw_rules0
+        + anro_iptables_ipv4_raw_rules1
+        + anro_iptables_ipv4_raw_rules2
+        + anro_iptables_ipv4_raw_rules3
+        + anro_iptables_ipv4_raw_rules4
+        + anro_iptables_ipv4_raw_rules5
+        + anro_iptables_ipv4_raw_rules6
+        + anro_iptables_ipv4_raw_rules7
+        + anro_iptables_ipv4_raw_rules8
+        + anro_iptables_ipv4_raw_rules9
+        + anro_iptables_ipv4_raw_rules
+      }}
+
+- name: PREPARE | Assemble ipv6 filter rules
+  ansible.builtin.set_fact:
+    _anro_iptables_ipv6_filter_rules: >-
+      {{
+        anro_iptables_ipv6_rules0
+        + anro_iptables_ipv6_rules1
+        + anro_iptables_ipv6_rules2
+        + anro_iptables_ipv6_rules3
+        + anro_iptables_ipv6_rules4
+        + anro_iptables_ipv6_rules5
+        + anro_iptables_ipv6_rules6
+        + anro_iptables_ipv6_rules7
+        + anro_iptables_ipv6_rules8
+        + anro_iptables_ipv6_rules9
+        + anro_iptables_ipv6_rules
+        + anro_iptables_ipv6_filter_rules0
+        + anro_iptables_ipv6_filter_rules1
+        + anro_iptables_ipv6_filter_rules2
+        + anro_iptables_ipv6_filter_rules3
+        + anro_iptables_ipv6_filter_rules4
+        + anro_iptables_ipv6_filter_rules5
+        + anro_iptables_ipv6_filter_rules6
+        + anro_iptables_ipv6_filter_rules7
+        + anro_iptables_ipv6_filter_rules8
+        + anro_iptables_ipv6_filter_rules9
+        + anro_iptables_ipv6_filter_rules
+      }}
+
+- name: PREPARE | Assemble ipv6 nat rules
+  ansible.builtin.set_fact:
+    _anro_iptables_ipv6_nat_rules: >-
+      {{
+        anro_iptables_ipv6_nat_rules0
+        + anro_iptables_ipv6_nat_rules1
+        + anro_iptables_ipv6_nat_rules2
+        + anro_iptables_ipv6_nat_rules3
+        + anro_iptables_ipv6_nat_rules4
+        + anro_iptables_ipv6_nat_rules5
+        + anro_iptables_ipv6_nat_rules6
+        + anro_iptables_ipv6_nat_rules7
+        + anro_iptables_ipv6_nat_rules8
+        + anro_iptables_ipv6_nat_rules9
+        + anro_iptables_ipv6_nat_rules
+      }}
+
+- name: PREPARE | Assemble ipv6 mangle rules
+  ansible.builtin.set_fact:
+    _anro_iptables_ipv6_mangle_rules: >-
+      {{
+        anro_iptables_ipv6_mangle_rules0
+        + anro_iptables_ipv6_mangle_rules1
+        + anro_iptables_ipv6_mangle_rules2
+        + anro_iptables_ipv6_mangle_rules3
+        + anro_iptables_ipv6_mangle_rules4
+        + anro_iptables_ipv6_mangle_rules5
+        + anro_iptables_ipv6_mangle_rules6
+        + anro_iptables_ipv6_mangle_rules7
+        + anro_iptables_ipv6_mangle_rules8
+        + anro_iptables_ipv6_mangle_rules9
+        + anro_iptables_ipv6_mangle_rules
+      }}
+
+- name: PREPARE | Assemble ipv6 raw rules
+  ansible.builtin.set_fact:
+    _anro_iptables_ipv6_raw_rules: >-
+      {{
+        anro_iptables_ipv6_raw_rules0
+        + anro_iptables_ipv6_raw_rules1
+        + anro_iptables_ipv6_raw_rules2
+        + anro_iptables_ipv6_raw_rules3
+        + anro_iptables_ipv6_raw_rules4
+        + anro_iptables_ipv6_raw_rules5
+        + anro_iptables_ipv6_raw_rules6
+        + anro_iptables_ipv6_raw_rules7
+        + anro_iptables_ipv6_raw_rules8
+        + anro_iptables_ipv6_raw_rules9
+        + anro_iptables_ipv6_raw_rules
+      }}

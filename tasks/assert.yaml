@@ -1,0 +1,69 @@
+---
+- name: ASSERT | Validate supported platform
+  ansible.builtin.assert:
+    that:
+      - ansible_os_family is defined
+      - ansible_os_family == 'Debian'
+      - ansible_service_mgr is defined
+      - ansible_service_mgr == 'systemd'
+    fail_msg: >-
+      anro_iptables supports Debian-family hosts using systemd. Ensure facts are
+      gathered and the target is Debian or Ubuntu with systemd.
+
+- name: ASSERT | Validate at least one address family is enabled
+  ansible.builtin.assert:
+    that:
+      - anro_iptables_ipv4_enabled | bool or anro_iptables_ipv6_enabled | bool
+    fail_msg: At least one of anro_iptables_ipv4_enabled or anro_iptables_ipv6_enabled must be true.
+
+- name: ASSERT | Validate filter policies
+  ansible.builtin.assert:
+    that:
+      - anro_iptables_input_policy | upper in ['ACCEPT', 'DROP', 'QUEUE']
+      - anro_iptables_forward_policy | upper in ['ACCEPT', 'DROP', 'QUEUE']
+      - anro_iptables_output_policy | upper in ['ACCEPT', 'DROP', 'QUEUE']
+    fail_msg: Filter policies must be ACCEPT, DROP, or QUEUE.
+
+- name: ASSERT | Validate static host groups
+  ansible.builtin.assert:
+    that:
+      - item.name is defined
+      - item.name | string | length > 0
+      - item.name | string | length <= 28
+      - item.name | string is match('^[A-Za-z0-9_][A-Za-z0-9_.+-]*$')
+      - (item.ipv4 | default([]) | length > 0) or (item.ipv6 | default([]) | length > 0)
+    fail_msg: >-
+      Each anro_iptables_host_groups item requires a valid name (1-28 characters,
+      letters/numbers/._+- only) and at least one ipv4 or ipv6 entry.
+  loop: "{{ anro_iptables_host_groups }}"
+  loop_control:
+    label: "{{ item.name | default('unnamed') }}"
+
+- name: ASSERT | Validate requested inventory groups exist
+  ansible.builtin.assert:
+    that:
+      - item in groups
+      - item | length <= 28
+      - item is match('^[A-Za-z0-9_][A-Za-z0-9_.+-]*$')
+    fail_msg: >-
+      Inventory firewall group '{{ item }}' must exist and its name must be a
+      valid iptables chain name of at most 28 characters.
+  loop: "{{ anro_iptables_ansible_host_groups }}"
+
+- name: ASSERT | Validate IP set definitions
+  ansible.builtin.assert:
+    that:
+      - item.name is defined
+      - item.name | string | length > 0
+      - item.set is defined
+      - item.set is not string
+      - item.family | default(anro_iptables_ipset_family) in ['inet', 'inet6']
+      - item.hashsize | default(anro_iptables_ipset_hashsize) | int > 0
+      - item.maxelem | default(anro_iptables_ipset_maxelem) | int > 0
+    fail_msg: >-
+      Every anro_iptables_ipsets item requires name and set; family must be inet
+      or inet6 and hashsize/maxelem must be positive integers.
+  loop: "{{ anro_iptables_ipsets }}"
+  loop_control:
+    label: "{{ item.name | default('unnamed') }}"
+  when: anro_iptables_ipset_enabled | bool

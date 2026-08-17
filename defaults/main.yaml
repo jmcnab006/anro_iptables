@@ -1,22 +1,123 @@
 ---
-anro_iptables_debug: false
 
+# General
+anro_iptables_debug: false
+anro_iptables_ipv4_enabled: true
+anro_iptables_ipv6_enabled: true
+anro_iptables_config_dir: '/etc/iptables'
+anro_iptables_ipv4_save_file: 'rules.v4'
+anro_iptables_ipv6_save_file: 'rules.v6'
 anro_iptables_ipv4_command: '/usr/sbin/iptables-restore'
 anro_iptables_ipv6_command: '/usr/sbin/ip6tables-restore'
-anro_iptables_ipset_command: '/usr/sbin/ipset'
+anro_iptables_restore_noflush: false
+anro_iptables_remove_firewalld: true
 
-anro_iptables_docker_enabled: false
-anro_iptables_docker_ipv4_subnets:
-  - '172.17.0.0/16'
-anro_iptables_docker_ipv6_subnets:
-  - 'fd00::/80'
+# Filter table policies
+anro_iptables_input_policy: 'ACCEPT'
+anro_iptables_forward_policy: 'ACCEPT'
+anro_iptables_output_policy: 'ACCEPT'
 
-anro_iptables_input_policy: accept
-anro_iptables_forward_policy: accept
-anro_iptables_output_policy: accept
+# IPV4 table rules
+anro_iptables_ipv4_filter_rules: []
+anro_iptables_ipv4_filter_rules0: []
+anro_iptables_ipv4_filter_rules1: []
+anro_iptables_ipv4_filter_rules2: []
+anro_iptables_ipv4_filter_rules3: []
+anro_iptables_ipv4_filter_rules4: []
+anro_iptables_ipv4_filter_rules5: []
+anro_iptables_ipv4_filter_rules6: []
+anro_iptables_ipv4_filter_rules7: []
+anro_iptables_ipv4_filter_rules8: []
+anro_iptables_ipv4_filter_rules9: []
 
-# IPv4/IPv6 rule sets that will be concatenated in ascending order. Allows similar blocks of rules across
-# environments without duplicating rulesets.
+anro_iptables_ipv4_nat_rules: []
+anro_iptables_ipv4_nat_rules0: []
+anro_iptables_ipv4_nat_rules1: []
+anro_iptables_ipv4_nat_rules2: []
+anro_iptables_ipv4_nat_rules3: []
+anro_iptables_ipv4_nat_rules4: []
+anro_iptables_ipv4_nat_rules5: []
+anro_iptables_ipv4_nat_rules6: []
+anro_iptables_ipv4_nat_rules7: []
+anro_iptables_ipv4_nat_rules8: []
+anro_iptables_ipv4_nat_rules9: []
+
+anro_iptables_ipv4_mangle_rules: []
+anro_iptables_ipv4_mangle_rules0: []
+anro_iptables_ipv4_mangle_rules1: []
+anro_iptables_ipv4_mangle_rules2: []
+anro_iptables_ipv4_mangle_rules3: []
+anro_iptables_ipv4_mangle_rules4: []
+anro_iptables_ipv4_mangle_rules5: []
+anro_iptables_ipv4_mangle_rules6: []
+anro_iptables_ipv4_mangle_rules7: []
+anro_iptables_ipv4_mangle_rules8: []
+anro_iptables_ipv4_mangle_rules9: []
+
+anro_iptables_ipv4_raw_rules: []
+anro_iptables_ipv4_raw_rules0: []
+anro_iptables_ipv4_raw_rules1: []
+anro_iptables_ipv4_raw_rules2: []
+anro_iptables_ipv4_raw_rules3: []
+anro_iptables_ipv4_raw_rules4: []
+anro_iptables_ipv4_raw_rules5: []
+anro_iptables_ipv4_raw_rules6: []
+anro_iptables_ipv4_raw_rules7: []
+anro_iptables_ipv4_raw_rules8: []
+anro_iptables_ipv4_raw_rules9: []
+
+# IPV6 table rules
+anro_iptables_ipv6_filter_rules: []
+anro_iptables_ipv6_filter_rules0: []
+anro_iptables_ipv6_filter_rules1: []
+anro_iptables_ipv6_filter_rules2: []
+anro_iptables_ipv6_filter_rules3: []
+anro_iptables_ipv6_filter_rules4: []
+anro_iptables_ipv6_filter_rules5: []
+anro_iptables_ipv6_filter_rules6: []
+anro_iptables_ipv6_filter_rules7: []
+anro_iptables_ipv6_filter_rules8: []
+anro_iptables_ipv6_filter_rules9: []
+
+anro_iptables_ipv6_nat_rules: []
+anro_iptables_ipv6_nat_rules0: []
+anro_iptables_ipv6_nat_rules1: []
+anro_iptables_ipv6_nat_rules2: []
+anro_iptables_ipv6_nat_rules3: []
+anro_iptables_ipv6_nat_rules4: []
+anro_iptables_ipv6_nat_rules5: []
+anro_iptables_ipv6_nat_rules6: []
+anro_iptables_ipv6_nat_rules7: []
+anro_iptables_ipv6_nat_rules8: []
+anro_iptables_ipv6_nat_rules9: []
+
+anro_iptables_ipv6_mangle_rules: []
+anro_iptables_ipv6_mangle_rules0: []
+anro_iptables_ipv6_mangle_rules1: []
+anro_iptables_ipv6_mangle_rules2: []
+anro_iptables_ipv6_mangle_rules3: []
+anro_iptables_ipv6_mangle_rules4: []
+anro_iptables_ipv6_mangle_rules5: []
+anro_iptables_ipv6_mangle_rules6: []
+anro_iptables_ipv6_mangle_rules7: []
+anro_iptables_ipv6_mangle_rules8: []
+anro_iptables_ipv6_mangle_rules9: []
+
+anro_iptables_ipv6_raw_rules: []
+anro_iptables_ipv6_raw_rules0: []
+anro_iptables_ipv6_raw_rules1: []
+anro_iptables_ipv6_raw_rules2: []
+anro_iptables_ipv6_raw_rules3: []
+anro_iptables_ipv6_raw_rules4: []
+anro_iptables_ipv6_raw_rules5: []
+anro_iptables_ipv6_raw_rules6: []
+anro_iptables_ipv6_raw_rules7: []
+anro_iptables_ipv6_raw_rules8: []
+anro_iptables_ipv6_raw_rules9: []
+
+# Legacy filter rule variables retained for v1 compatibility.
+# They are appended before the new filter rule inputs.
+anro_iptables_ipv4_rules: []
 anro_iptables_ipv4_rules0: []
 anro_iptables_ipv4_rules1: []
 anro_iptables_ipv4_rules2: []
@@ -27,7 +128,7 @@ anro_iptables_ipv4_rules6: []
 anro_iptables_ipv4_rules7: []
 anro_iptables_ipv4_rules8: []
 anro_iptables_ipv4_rules9: []
-
+anro_iptables_ipv6_rules: []
 anro_iptables_ipv6_rules0: []
 anro_iptables_ipv6_rules1: []
 anro_iptables_ipv6_rules2: []
@@ -39,55 +140,32 @@ anro_iptables_ipv6_rules7: []
 anro_iptables_ipv6_rules8: []
 anro_iptables_ipv6_rules9: []
 
-
-# These will be the DOCKER-USER rules
-anro_iptables_ipv4_docker_rules: []
-
-# Docker does not have very good ipv6 support but we should add this now
-anro_iptables_ipv6_docker_rules: []
-
-# The joined rules should form a full iptables rules set.
-
-anro_iptables_ipv4_rules: >-
-  {{ anro_iptables_ipv4_rules0
-   + anro_iptables_ipv4_rules1
-   + anro_iptables_ipv4_rules2
-   + anro_iptables_ipv4_rules3
-   + anro_iptables_ipv4_rules4
-   + anro_iptables_ipv4_rules5
-   + anro_iptables_ipv4_rules6
-   + anro_iptables_ipv4_rules7
-   + anro_iptables_ipv4_rules8
-   + anro_iptables_ipv4_rules9 }}
-
-anro_iptables_ipv6_rules: >-
-  {{ anro_iptables_ipv6_rules0
-   + anro_iptables_ipv6_rules1
-   + anro_iptables_ipv6_rules2
-   + anro_iptables_ipv6_rules3
-   + anro_iptables_ipv6_rules4
-   + anro_iptables_ipv6_rules5
-   + anro_iptables_ipv6_rules6
-   + anro_iptables_ipv6_rules7
-   + anro_iptables_ipv6_rules8
-   + anro_iptables_ipv6_rules9 }}
-
+# Static and inventory-derived filter chains
 anro_iptables_host_groups: []
-
 anro_iptables_ansible_host_groups: []
 anro_iptables_ansible_host_groups_ipv4_hostvar: 'ipv4'
 anro_iptables_ansible_host_groups_ipv6_hostvar: 'ipv6'
 
+# IP sets
 anro_iptables_ipset_enabled: false
+anro_iptables_ipset_command: '/usr/sbin/ipset'
 anro_iptables_ipset_hashsize: 1024
 anro_iptables_ipset_maxelem: 65536
 anro_iptables_ipset_family: 'inet'
 anro_iptables_ipset_type: 'hash:net'
-anro_iptables_ipset_config_dir: '/etc/iptables'
 anro_iptables_ipset_save_file: 'ipsets'
-
 anro_iptables_ipsets: []
-anro_iptables_nics: []
-anro_iptables_interfaces: []
-# replaces the anro_gateway role which enables sysctl packet forwarding.
+
+# Docker filter integration
+anro_iptables_docker_enabled: false
+anro_iptables_docker_restart_on_change: true
+anro_iptables_docker_ipv4_subnets:
+  - '172.17.0.0/16'
+anro_iptables_docker_ipv6_subnets:
+  - 'fd00::/80'
+anro_iptables_ipv4_docker_rules: []
+anro_iptables_ipv6_docker_rules: []
+
+# Routing / forwarding
 anro_iptables_gateway_enable: false
+anro_iptables_sysctl_file: '/etc/sysctl.d/99-anro-iptables-forwarding.conf'

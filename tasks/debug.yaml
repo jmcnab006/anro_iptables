@@ -1,0 +1,17 @@
+---
+- name: DEBUG | Show effective firewall configuration
+  ansible.builtin.debug:
+    msg:
+      ipv4_filter: "{{ _anro_iptables_ipv4_filter_rules }}"
+      ipv4_nat: "{{ _anro_iptables_ipv4_nat_rules }}"
+      ipv4_mangle: "{{ _anro_iptables_ipv4_mangle_rules }}"
+      ipv4_raw: "{{ _anro_iptables_ipv4_raw_rules }}"
+      ipv6_filter: "{{ _anro_iptables_ipv6_filter_rules }}"
+      ipv6_nat: "{{ _anro_iptables_ipv6_nat_rules }}"
+      ipv6_mangle: "{{ _anro_iptables_ipv6_mangle_rules }}"
+      ipv6_raw: "{{ _anro_iptables_ipv6_raw_rules }}"
+      host_groups: "{{ anro_iptables_host_groups }}"
+      inventory_host_groups: "{{ anro_iptables_ansible_host_groups }}"
+      ipsets: "{{ anro_iptables_ipsets }}"
+      docker_installed: "{{ _anro_iptables_docker_installed }}"
+      docker_running: "{{ _anro_iptables_docker_running }}"

@@ -1,101 +1,84 @@
 ---
-- name: All host variables
+- name: Example host firewall, router NAT, packet marking, raw rules, IPSet, and Docker policy
   hosts: all
   become: true
+
   vars:
-    anro_iptables_input_policy: drop
-    anro_iptables_forward_policy: drop
-    anro_iptables_output_policy: accept
+    # A restrictive host firewall. Change these deliberately for your environment.
+    anro_iptables_input_policy: DROP
+    anro_iptables_forward_policy: DROP
+    anro_iptables_output_policy: ACCEPT
 
-    anro_iptables_ipv4_rules1:
-      - -A INPUT -m state --state RELATED,ESTABLISHED -j ACCEPT
-      - -A INPUT -i lo -m state --state NEW -j ACCEPT
-      - -A INPUT -p icmp -m limit --limit 100/sec -m state --state NEW -j ACCEPT
+    # Layer 1: common baseline filter rules.
+    anro_iptables_ipv4_filter_rules1:
+      - '-A INPUT -i lo -j ACCEPT'
+      - '-A INPUT -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT'
+      - '-A INPUT -p icmp -j ACCEPT'
 
-    anro_iptables_ipv6_rules1:
-      - -A INPUT -i lo -j ACCEPT
-      - -A INPUT -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
-      - -A INPUT -m conntrack --ctstate INVALID -j DROP
-      - -A INPUT -s ::1/128 ! -i lo -j DROP
+    anro_iptables_ipv6_filter_rules1:
+      - '-A INPUT -i lo -j ACCEPT'
+      - '-A INPUT -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT'
+      - '-A INPUT -m conntrack --ctstate INVALID -j DROP'
+      - '-A INPUT -p ipv6-icmp -j ACCEPT'
 
-    anro_iptables_ipv6_rules6:
-      - -A INPUT -p ipv6-icmp -m icmp6 --icmpv6-type 1 -j ACCEPT
-      - -A INPUT -p ipv6-icmp -m icmp6 --icmpv6-type 2 -j ACCEPT
-      - -A INPUT -p ipv6-icmp -m icmp6 --icmpv6-type 3 -j ACCEPT
-      - -A INPUT -p ipv6-icmp -m icmp6 --icmpv6-type 4 -j ACCEPT
-      - -A INPUT -p ipv6-icmp -m icmp6 --icmpv6-type 128 -j ACCEPT
-      - -A INPUT -p ipv6-icmp -m icmp6 --icmpv6-type 129 -j ACCEPT
-      - -A INPUT -p ipv6-icmp -m icmp6 --icmpv6-type 133 -j ACCEPT
-      - -A INPUT -p ipv6-icmp -m icmp6 --icmpv6-type 134 -j ACCEPT
-      - -A INPUT -p ipv6-icmp -m icmp6 --icmpv6-type 135 -j ACCEPT
-      - -A INPUT -p ipv6-icmp -m icmp6 --icmpv6-type 136 -j ACCEPT
-      - -A INPUT -p ipv6-icmp -m icmp6 --icmpv6-type 137 -j ACCEPT
-      - -A INPUT -p ipv6-icmp -m icmp6 --icmpv6-type 141 -j ACCEPT
-      - -A INPUT -p ipv6-icmp -m icmp6 --icmpv6-type 142 -j ACCEPT
-      - -A INPUT -s fe80::/10 -p ipv6-icmp -m icmp6 --icmpv6-type 130 -j ACCEPT
-      - -A INPUT -s fe80::/10 -p ipv6-icmp -m icmp6 --icmpv6-type 131 -j ACCEPT
-      - -A INPUT -s fe80::/10 -p ipv6-icmp -m icmp6 --icmpv6-type 132 -j ACCEPT
-      - -A INPUT -s fe80::/10 -p ipv6-icmp -m icmp6 --icmpv6-type 143 -j ACCEPT
-      - -A INPUT -p ipv6-icmp -m icmp6 --icmpv6-type 148 -j ACCEPT
-      - -A INPUT -p ipv6-icmp -m icmp6 --icmpv6-type 149 -j ACCEPT
-      - -A INPUT -s fe80::/10 -p ipv6-icmp -m icmp6 --icmpv6-type 151 -j ACCEPT
-      - -A INPUT -s fe80::/10 -p ipv6-icmp -m icmp6 --icmpv6-type 152 -j ACCEPT
-      - -A INPUT -s fe80::/10 -p ipv6-icmp -m icmp6 --icmpv6-type 153 -j ACCEPT
+    # Layer 4: service-specific access. PRIVATE is generated below.
+    anro_iptables_ipv4_filter_rules4:
+      - '-A INPUT -p tcp --dport 22 -j PRIVATE'
+      - '-A INPUT -p tcp -m multiport --dports 80,443 -j ACCEPT'
+
+    anro_iptables_ipv6_filter_rules4:
+      - '-A INPUT -p tcp --dport 22 -j PRIVATE'
+      - '-A INPUT -p tcp -m multiport --dports 80,443 -j ACCEPT'
+
+    # Static source groups become filter-table chains.
+    anro_iptables_host_groups:
+      - name: PRIVATE
+        ipv4:
+          - 10.0.0.0/8
+          - 172.16.0.0/12
+          - 192.168.0.0/16
+        ipv6:
+          - fd00::/8
+
+    # NAT use case: route 10.20.0.0/16 through this host and masquerade it.
+    # Set this only on a gateway/router host in real inventory.
+    anro_iptables_gateway_enable: true
+    anro_iptables_ipv4_nat_rules5:
+      - '-A POSTROUTING -s 10.20.0.0/16 -o eth0 -j MASQUERADE'
+
+    # Mangle use case: mark inbound HTTPS traffic for policy routing/QoS.
+    anro_iptables_ipv4_mangle_rules5:
+      - '-A PREROUTING -p tcp --dport 443 -j MARK --set-mark 10'
+
+    # Raw use case: bypass conntrack for a high-volume UDP telemetry flow.
+    # Only use NOTRACK when the application and downstream filter policy are designed for it.
+    anro_iptables_ipv4_raw_rules5:
+      - '-A PREROUTING -p udp --dport 8125 -j NOTRACK'
+      - '-A OUTPUT -p udp --sport 8125 -j NOTRACK'
+
+    # IPSet use case. Rules can reference this with --match-set ADMIN_NETS src.
+    anro_iptables_ipset_enabled: true
+    anro_iptables_ipsets:
+      - name: ADMIN_NETS
+        type: hash:net
+        family: inet
+        set:
+          - 192.0.2.0/24
+          - 198.51.100.32/27
+      - name: ADMIN_NETS6
+        type: hash:net
+        family: inet6
+        set:
+          - 2001:db8:100::/48
+
+    anro_iptables_ipv4_filter_rules3:
+      - '-A INPUT -p tcp --dport 9100 -m set --match-set ADMIN_NETS src -j ACCEPT'
+
+    # Docker use case. When Docker is installed, the role manages DOCKER-USER.
+    # Custom rules are inserted before the role's final DOCKER-USER DROP.
+    anro_iptables_docker_enabled: false
+    anro_iptables_ipv4_docker_rules:
+      - '-A DOCKER-USER -i eth0 -s 198.51.100.0/24 -p tcp --dport 8443 -j ACCEPT'
 
   roles:
     - role: anro_iptables
-      vars:
-        anro_iptables_debug: true
-        anro_iptables_interfaces:
-          - eth0
-          - eth1
-        anro_iptables_host_groups:
-          - name: PRIVATE
-            ipv4:
-              - 172.16.31.50/24
-            ipv6:
-              - 2605:5400:0:33::/64
-          - name: PUBLIC
-            ipv4:
-              - 8.8.8.0/24
-
-        anro_iptables_ipset_enabled: true
-
-        anro_iptables_ipset_sets:
-          - name: PUBLIC
-            type: 'hash:net'
-            family: inet
-            bucketsize: 10
-            set:
-              - 8.8.8.0/24
-
-        anro_iptables_ipv4_rules2:
-          - -A INPUT -p tcp -m tcp --dport 22 -m state --state NEW -j PRIVATE
-          - -A INPUT -p tcp -m tcp --dport 22 -m state --state NEW -j PUBLIC
-          - "-A INPUT -i {{ iptables_interfaces[0] }} -p tcp -m tcp --dport 22 -m state --state NEW -j LEGACY"
-          - "-A INPUT -i {{ iptables_interfaces[1] }} -p tcp -m tcp --dport 22 -m state --state NEW -j LEGACY"
-
-        # IPSET example
-        anro_iptables_ipv4_rules3:
-          - >-
-            -A INPUT
-            -i {{ iptables_interfaces[1] }}
-            -p tcp -m tcp
-            --dport 22
-            -m state --state NEW
-            -m set --match-set PUBLIC src
-            -j ACCEPT
-          - >-
-            -A INPUT
-            -i {{ iptables_interfaces[0] }}
-            -p tcp -m tcp
-            --dport 22
-            -m state --state NEW
-            -m set --match-set {{ iptables_ipset_sets[0].name }} src
-            -j ACCEPT
-
-
-        anro_iptables_ipv6_rules2:
-          - -A INPUT -p udp -m udp --dport 161 -j PRIVATE
-          - -A INPUT -p tcp -m tcp --dport 3306 -m state --state NEW -j PRIVATE
-          - -A INPUT -p tcp -m tcp --dport 22 -m state --state NEW -j PRIVATE

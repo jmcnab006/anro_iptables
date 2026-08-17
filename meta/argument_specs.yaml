@@ -1,128 +1,892 @@
 ---
 argument_specs:
   main:
-    short_description: 'Install and configure iptables and optionally ipsets on your system.'
-    description: >
-      Install and configure iptables on your system.
+    short_description: Manage persistent Debian/Ubuntu iptables rulesets and optional IP sets.
+    description:
+    - Build complete IPv4 and IPv6 iptables-restore files with layered filter, nat, mangle, and raw tables.
     author: Jeremy McNab
     options:
       anro_iptables_debug:
-        type: 'bool'
+        type: bool
         default: false
-        description: 'Enable additional output on the console'
+        description:
+        - Enable additional debug output.
+      anro_iptables_ipv4_enabled:
+        type: bool
+        default: true
+        description:
+        - Manage and persist IPv4 rules.
+      anro_iptables_ipv6_enabled:
+        type: bool
+        default: true
+        description:
+        - Manage and persist IPv6 rules.
+      anro_iptables_config_dir:
+        type: str
+        default: /etc/iptables
+        description:
+        - Directory containing persistent firewall files.
+      anro_iptables_ipv4_save_file:
+        type: str
+        default: rules.v4
+        description:
+        - IPv4 persistent rules filename.
+      anro_iptables_ipv6_save_file:
+        type: str
+        default: rules.v6
+        description:
+        - IPv6 persistent rules filename.
       anro_iptables_ipv4_command:
-        type: 'str'
-        default: '/usr/sbin/iptables-restore'
-        description: 'Command path for iptables ipv4 command'
+        type: str
+        default: /usr/sbin/iptables-restore
+        description:
+        - Path to iptables-restore.
       anro_iptables_ipv6_command:
-        type: 'str'
-        default: '/usr/sbin/ip6tables-restore'
-        description: 'Command path for iptables ipv6 command'
-      anro_iptables_ipset_command:
-        type: 'str'
-        default: '/usr/sbin/ipset'
-        description: 'Command path for ipset'
-      anro_iptables_ipv4_rules1:
-        type: 'list'
-        default: []
-        description: 'First list element for ipv4 rules definitions'
-      anro_iptables_ipv4_rules6:
-        type: 'list'
-        default: []
-        description: 'Last list element for ipv4 rules definitions'
-      anro_iptables_ipv6_rules1:
-        type: 'list'
-        default: []
-        description: 'First list element for ipv6 rules definitions'
-      anro_iptables_ipv6_rules6:
-        type: 'list'
-        default: []
-        description: 'Last list element for ipv6 rules definitions'
-      anro_iptables_ipv4_rules:
-        type: 'list'
-        default: []
-        description: 'Full list of ipv4 rules'
-      anro_iptables_ipv6_rules:
-        type: 'list'
-        default: []
-        description: 'Full list of ipv6 rules'
-      anro_iptables_host_groups:
-        type: 'list'
-        default: []
-        description: 'List of dict elements defining a host group'
-      anro_iptables_ipset_enabled:
-        type: 'bool'
+        type: str
+        default: /usr/sbin/ip6tables-restore
+        description:
+        - Path to ip6tables-restore.
+      anro_iptables_restore_noflush:
+        type: bool
         default: false
-        description: 'Install and configure IPSet or not'
-      anro_iptables_ipset_hashsize:
-        type: 'int'
-        default: 1024
-        description: 'IPSet hashsize'
-      anro_iptables_ipset_maxelem:
-        type: 'int'
-        default: 65536
-        description: 'IPSet max element'
-      anro_iptables_ipset_bucketsize:
-        type: 'int'
-        default: 12
-        description: 'IPSet bucket size'
-      anro_iptables_ipset_family:
-        type: 'str'
-        default: 'inet'
-        description: 'IPSet family'
-      anro_iptables_ipset_type:
-        type: 'str'
-        default: 'hash:net'
-        description: 'IPSet type'
-      anro_iptables_ipset_config_dir:
-        type: 'str'
-        default: '/etc/iptables'
-        description: 'IPset configuration file directory'
-      anro_iptables_ipset_save_file:
-        type: 'str'
-        default: 'ipsets'
-        description: 'IPSet default save file name'
-      anro_iptables_ipsets:
-        type: 'list'
-        default: []
-        description: 'IPSet list of defined ipsets'
-      anro_iptables_interfaces:
-        type: 'list'
-        default: []
-        description: 'A list of interfaces to be used in rules'
-      anro_iptables_ansible_host_groups:
-        type: 'list'
-        default: []
-        description: 'A list of Ansible group names to include in the template'
-      anro_iptables_ansible_host_groups_ipv4_hostvar:
-        type: 'str'
-        default: 'ipv4'
-        description: 'The host variable which contains the host IPv4 address'
-      anro_iptables_ansible_host_groups_ipv6_hostvar:
-        type: 'str'
-        default: 'ipv6'
-        description: 'The host variable which contains the host IPv6 address'
-      anro_iptables_docker_enabled:
-        type: 'bool'
-        default: false
-        description: 'Flag to enable docker functionality iptables rules'
-      anro_iptables_docker_ipv4_subnets:
-        type: 'list'
-        default: ['172.17.0.0/16']
-        description: "Default IPv4 subnets used by Docker"
-      anro_iptables_docker_ipv6_subnets:
-        type: 'list'
-        default: ['fd00::/80']
-        description: "Default IPv6 subnets used by Docker"
+        description:
+        - Pass --noflush when applying rules. False makes rendered tables authoritative.
+      anro_iptables_remove_firewalld:
+        type: bool
+        default: true
+        description:
+        - Remove firewalld to avoid competing firewall managers.
       anro_iptables_input_policy:
-        type: 'str'
-        default: 'accept'
-        description: "Iptables INPUT chain policy"
+        type: str
+        default: ACCEPT
+        description:
+        - Default INPUT policy for the filter table. ACCEPT, DROP, or QUEUE.
       anro_iptables_forward_policy:
-        type: 'str'
-        default: 'accept'
-        description: "Iptables FORWARD chain policy"
+        type: str
+        default: ACCEPT
+        description:
+        - Default FORWARD policy for the filter table. ACCEPT, DROP, or QUEUE.
       anro_iptables_output_policy:
-        type: 'str'
-        default: 'accept'
-        description: "Iptables OUTPUT chain policy"
+        type: str
+        default: ACCEPT
+        description:
+        - Default OUTPUT policy for the filter table. ACCEPT, DROP, or QUEUE.
+      anro_iptables_ipv4_filter_rules:
+        type: list
+        elements: str
+        default: []
+        description:
+        - Direct IPV4 filter table rules.
+      anro_iptables_ipv4_filter_rules0:
+        type: list
+        elements: str
+        default: []
+        description:
+        - Layer 0 IPV4 filter rules. Layers are concatenated in numeric order.
+      anro_iptables_ipv4_filter_rules1:
+        type: list
+        elements: str
+        default: []
+        description:
+        - Layer 1 IPV4 filter rules. Layers are concatenated in numeric order.
+      anro_iptables_ipv4_filter_rules2:
+        type: list
+        elements: str
+        default: []
+        description:
+        - Layer 2 IPV4 filter rules. Layers are concatenated in numeric order.
+      anro_iptables_ipv4_filter_rules3:
+        type: list
+        elements: str
+        default: []
+        description:
+        - Layer 3 IPV4 filter rules. Layers are concatenated in numeric order.
+      anro_iptables_ipv4_filter_rules4:
+        type: list
+        elements: str
+        default: []
+        description:
+        - Layer 4 IPV4 filter rules. Layers are concatenated in numeric order.
+      anro_iptables_ipv4_filter_rules5:
+        type: list
+        elements: str
+        default: []
+        description:
+        - Layer 5 IPV4 filter rules. Layers are concatenated in numeric order.
+      anro_iptables_ipv4_filter_rules6:
+        type: list
+        elements: str
+        default: []
+        description:
+        - Layer 6 IPV4 filter rules. Layers are concatenated in numeric order.
+      anro_iptables_ipv4_filter_rules7:
+        type: list
+        elements: str
+        default: []
+        description:
+        - Layer 7 IPV4 filter rules. Layers are concatenated in numeric order.
+      anro_iptables_ipv4_filter_rules8:
+        type: list
+        elements: str
+        default: []
+        description:
+        - Layer 8 IPV4 filter rules. Layers are concatenated in numeric order.
+      anro_iptables_ipv4_filter_rules9:
+        type: list
+        elements: str
+        default: []
+        description:
+        - Layer 9 IPV4 filter rules. Layers are concatenated in numeric order.
+      anro_iptables_ipv4_nat_rules:
+        type: list
+        elements: str
+        default: []
+        description:
+        - Direct IPV4 nat table rules.
+      anro_iptables_ipv4_nat_rules0:
+        type: list
+        elements: str
+        default: []
+        description:
+        - Layer 0 IPV4 nat rules. Layers are concatenated in numeric order.
+      anro_iptables_ipv4_nat_rules1:
+        type: list
+        elements: str
+        default: []
+        description:
+        - Layer 1 IPV4 nat rules. Layers are concatenated in numeric order.
+      anro_iptables_ipv4_nat_rules2:
+        type: list
+        elements: str
+        default: []
+        description:
+        - Layer 2 IPV4 nat rules. Layers are concatenated in numeric order.
+      anro_iptables_ipv4_nat_rules3:
+        type: list
+        elements: str
+        default: []
+        description:
+        - Layer 3 IPV4 nat rules. Layers are concatenated in numeric order.
+      anro_iptables_ipv4_nat_rules4:
+        type: list
+        elements: str
+        default: []
+        description:
+        - Layer 4 IPV4 nat rules. Layers are concatenated in numeric order.
+      anro_iptables_ipv4_nat_rules5:
+        type: list
+        elements: str
+        default: []
+        description:
+        - Layer 5 IPV4 nat rules. Layers are concatenated in numeric order.
+      anro_iptables_ipv4_nat_rules6:
+        type: list
+        elements: str
+        default: []
+        description:
+        - Layer 6 IPV4 nat rules. Layers are concatenated in numeric order.
+      anro_iptables_ipv4_nat_rules7:
+        type: list
+        elements: str
+        default: []
+        description:
+        - Layer 7 IPV4 nat rules. Layers are concatenated in numeric order.
+      anro_iptables_ipv4_nat_rules8:
+        type: list
+        elements: str
+        default: []
+        description:
+        - Layer 8 IPV4 nat rules. Layers are concatenated in numeric order.
+      anro_iptables_ipv4_nat_rules9:
+        type: list
+        elements: str
+        default: []
+        description:
+        - Layer 9 IPV4 nat rules. Layers are concatenated in numeric order.
+      anro_iptables_ipv4_mangle_rules:
+        type: list
+        elements: str
+        default: []
+        description:
+        - Direct IPV4 mangle table rules.
+      anro_iptables_ipv4_mangle_rules0:
+        type: list
+        elements: str
+        default: []
+        description:
+        - Layer 0 IPV4 mangle rules. Layers are concatenated in numeric order.
+      anro_iptables_ipv4_mangle_rules1:
+        type: list
+        elements: str
+        default: []
+        description:
+        - Layer 1 IPV4 mangle rules. Layers are concatenated in numeric order.
+      anro_iptables_ipv4_mangle_rules2:
+        type: list
+        elements: str
+        default: []
+        description:
+        - Layer 2 IPV4 mangle rules. Layers are concatenated in numeric order.
+      anro_iptables_ipv4_mangle_rules3:
+        type: list
+        elements: str
+        default: []
+        description:
+        - Layer 3 IPV4 mangle rules. Layers are concatenated in numeric order.
+      anro_iptables_ipv4_mangle_rules4:
+        type: list
+        elements: str
+        default: []
+        description:
+        - Layer 4 IPV4 mangle rules. Layers are concatenated in numeric order.
+      anro_iptables_ipv4_mangle_rules5:
+        type: list
+        elements: str
+        default: []
+        description:
+        - Layer 5 IPV4 mangle rules. Layers are concatenated in numeric order.
+      anro_iptables_ipv4_mangle_rules6:
+        type: list
+        elements: str
+        default: []
+        description:
+        - Layer 6 IPV4 mangle rules. Layers are concatenated in numeric order.
+      anro_iptables_ipv4_mangle_rules7:
+        type: list
+        elements: str
+        default: []
+        description:
+        - Layer 7 IPV4 mangle rules. Layers are concatenated in numeric order.
+      anro_iptables_ipv4_mangle_rules8:
+        type: list
+        elements: str
+        default: []
+        description:
+        - Layer 8 IPV4 mangle rules. Layers are concatenated in numeric order.
+      anro_iptables_ipv4_mangle_rules9:
+        type: list
+        elements: str
+        default: []
+        description:
+        - Layer 9 IPV4 mangle rules. Layers are concatenated in numeric order.
+      anro_iptables_ipv4_raw_rules:
+        type: list
+        elements: str
+        default: []
+        description:
+        - Direct IPV4 raw table rules.
+      anro_iptables_ipv4_raw_rules0:
+        type: list
+        elements: str
+        default: []
+        description:
+        - Layer 0 IPV4 raw rules. Layers are concatenated in numeric order.
+      anro_iptables_ipv4_raw_rules1:
+        type: list
+        elements: str
+        default: []
+        description:
+        - Layer 1 IPV4 raw rules. Layers are concatenated in numeric order.
+      anro_iptables_ipv4_raw_rules2:
+        type: list
+        elements: str
+        default: []
+        description:
+        - Layer 2 IPV4 raw rules. Layers are concatenated in numeric order.
+      anro_iptables_ipv4_raw_rules3:
+        type: list
+        elements: str
+        default: []
+        description:
+        - Layer 3 IPV4 raw rules. Layers are concatenated in numeric order.
+      anro_iptables_ipv4_raw_rules4:
+        type: list
+        elements: str
+        default: []
+        description:
+        - Layer 4 IPV4 raw rules. Layers are concatenated in numeric order.
+      anro_iptables_ipv4_raw_rules5:
+        type: list
+        elements: str
+        default: []
+        description:
+        - Layer 5 IPV4 raw rules. Layers are concatenated in numeric order.
+      anro_iptables_ipv4_raw_rules6:
+        type: list
+        elements: str
+        default: []
+        description:
+        - Layer 6 IPV4 raw rules. Layers are concatenated in numeric order.
+      anro_iptables_ipv4_raw_rules7:
+        type: list
+        elements: str
+        default: []
+        description:
+        - Layer 7 IPV4 raw rules. Layers are concatenated in numeric order.
+      anro_iptables_ipv4_raw_rules8:
+        type: list
+        elements: str
+        default: []
+        description:
+        - Layer 8 IPV4 raw rules. Layers are concatenated in numeric order.
+      anro_iptables_ipv4_raw_rules9:
+        type: list
+        elements: str
+        default: []
+        description:
+        - Layer 9 IPV4 raw rules. Layers are concatenated in numeric order.
+      anro_iptables_ipv6_filter_rules:
+        type: list
+        elements: str
+        default: []
+        description:
+        - Direct IPV6 filter table rules.
+      anro_iptables_ipv6_filter_rules0:
+        type: list
+        elements: str
+        default: []
+        description:
+        - Layer 0 IPV6 filter rules. Layers are concatenated in numeric order.
+      anro_iptables_ipv6_filter_rules1:
+        type: list
+        elements: str
+        default: []
+        description:
+        - Layer 1 IPV6 filter rules. Layers are concatenated in numeric order.
+      anro_iptables_ipv6_filter_rules2:
+        type: list
+        elements: str
+        default: []
+        description:
+        - Layer 2 IPV6 filter rules. Layers are concatenated in numeric order.
+      anro_iptables_ipv6_filter_rules3:
+        type: list
+        elements: str
+        default: []
+        description:
+        - Layer 3 IPV6 filter rules. Layers are concatenated in numeric order.
+      anro_iptables_ipv6_filter_rules4:
+        type: list
+        elements: str
+        default: []
+        description:
+        - Layer 4 IPV6 filter rules. Layers are concatenated in numeric order.
+      anro_iptables_ipv6_filter_rules5:
+        type: list
+        elements: str
+        default: []
+        description:
+        - Layer 5 IPV6 filter rules. Layers are concatenated in numeric order.
+      anro_iptables_ipv6_filter_rules6:
+        type: list
+        elements: str
+        default: []
+        description:
+        - Layer 6 IPV6 filter rules. Layers are concatenated in numeric order.
+      anro_iptables_ipv6_filter_rules7:
+        type: list
+        elements: str
+        default: []
+        description:
+        - Layer 7 IPV6 filter rules. Layers are concatenated in numeric order.
+      anro_iptables_ipv6_filter_rules8:
+        type: list
+        elements: str
+        default: []
+        description:
+        - Layer 8 IPV6 filter rules. Layers are concatenated in numeric order.
+      anro_iptables_ipv6_filter_rules9:
+        type: list
+        elements: str
+        default: []
+        description:
+        - Layer 9 IPV6 filter rules. Layers are concatenated in numeric order.
+      anro_iptables_ipv6_nat_rules:
+        type: list
+        elements: str
+        default: []
+        description:
+        - Direct IPV6 nat table rules.
+      anro_iptables_ipv6_nat_rules0:
+        type: list
+        elements: str
+        default: []
+        description:
+        - Layer 0 IPV6 nat rules. Layers are concatenated in numeric order.
+      anro_iptables_ipv6_nat_rules1:
+        type: list
+        elements: str
+        default: []
+        description:
+        - Layer 1 IPV6 nat rules. Layers are concatenated in numeric order.
+      anro_iptables_ipv6_nat_rules2:
+        type: list
+        elements: str
+        default: []
+        description:
+        - Layer 2 IPV6 nat rules. Layers are concatenated in numeric order.
+      anro_iptables_ipv6_nat_rules3:
+        type: list
+        elements: str
+        default: []
+        description:
+        - Layer 3 IPV6 nat rules. Layers are concatenated in numeric order.
+      anro_iptables_ipv6_nat_rules4:
+        type: list
+        elements: str
+        default: []
+        description:
+        - Layer 4 IPV6 nat rules. Layers are concatenated in numeric order.
+      anro_iptables_ipv6_nat_rules5:
+        type: list
+        elements: str
+        default: []
+        description:
+        - Layer 5 IPV6 nat rules. Layers are concatenated in numeric order.
+      anro_iptables_ipv6_nat_rules6:
+        type: list
+        elements: str
+        default: []
+        description:
+        - Layer 6 IPV6 nat rules. Layers are concatenated in numeric order.
+      anro_iptables_ipv6_nat_rules7:
+        type: list
+        elements: str
+        default: []
+        description:
+        - Layer 7 IPV6 nat rules. Layers are concatenated in numeric order.
+      anro_iptables_ipv6_nat_rules8:
+        type: list
+        elements: str
+        default: []
+        description:
+        - Layer 8 IPV6 nat rules. Layers are concatenated in numeric order.
+      anro_iptables_ipv6_nat_rules9:
+        type: list
+        elements: str
+        default: []
+        description:
+        - Layer 9 IPV6 nat rules. Layers are concatenated in numeric order.
+      anro_iptables_ipv6_mangle_rules:
+        type: list
+        elements: str
+        default: []
+        description:
+        - Direct IPV6 mangle table rules.
+      anro_iptables_ipv6_mangle_rules0:
+        type: list
+        elements: str
+        default: []
+        description:
+        - Layer 0 IPV6 mangle rules. Layers are concatenated in numeric order.
+      anro_iptables_ipv6_mangle_rules1:
+        type: list
+        elements: str
+        default: []
+        description:
+        - Layer 1 IPV6 mangle rules. Layers are concatenated in numeric order.
+      anro_iptables_ipv6_mangle_rules2:
+        type: list
+        elements: str
+        default: []
+        description:
+        - Layer 2 IPV6 mangle rules. Layers are concatenated in numeric order.
+      anro_iptables_ipv6_mangle_rules3:
+        type: list
+        elements: str
+        default: []
+        description:
+        - Layer 3 IPV6 mangle rules. Layers are concatenated in numeric order.
+      anro_iptables_ipv6_mangle_rules4:
+        type: list
+        elements: str
+        default: []
+        description:
+        - Layer 4 IPV6 mangle rules. Layers are concatenated in numeric order.
+      anro_iptables_ipv6_mangle_rules5:
+        type: list
+        elements: str
+        default: []
+        description:
+        - Layer 5 IPV6 mangle rules. Layers are concatenated in numeric order.
+      anro_iptables_ipv6_mangle_rules6:
+        type: list
+        elements: str
+        default: []
+        description:
+        - Layer 6 IPV6 mangle rules. Layers are concatenated in numeric order.
+      anro_iptables_ipv6_mangle_rules7:
+        type: list
+        elements: str
+        default: []
+        description:
+        - Layer 7 IPV6 mangle rules. Layers are concatenated in numeric order.
+      anro_iptables_ipv6_mangle_rules8:
+        type: list
+        elements: str
+        default: []
+        description:
+        - Layer 8 IPV6 mangle rules. Layers are concatenated in numeric order.
+      anro_iptables_ipv6_mangle_rules9:
+        type: list
+        elements: str
+        default: []
+        description:
+        - Layer 9 IPV6 mangle rules. Layers are concatenated in numeric order.
+      anro_iptables_ipv6_raw_rules:
+        type: list
+        elements: str
+        default: []
+        description:
+        - Direct IPV6 raw table rules.
+      anro_iptables_ipv6_raw_rules0:
+        type: list
+        elements: str
+        default: []
+        description:
+        - Layer 0 IPV6 raw rules. Layers are concatenated in numeric order.
+      anro_iptables_ipv6_raw_rules1:
+        type: list
+        elements: str
+        default: []
+        description:
+        - Layer 1 IPV6 raw rules. Layers are concatenated in numeric order.
+      anro_iptables_ipv6_raw_rules2:
+        type: list
+        elements: str
+        default: []
+        description:
+        - Layer 2 IPV6 raw rules. Layers are concatenated in numeric order.
+      anro_iptables_ipv6_raw_rules3:
+        type: list
+        elements: str
+        default: []
+        description:
+        - Layer 3 IPV6 raw rules. Layers are concatenated in numeric order.
+      anro_iptables_ipv6_raw_rules4:
+        type: list
+        elements: str
+        default: []
+        description:
+        - Layer 4 IPV6 raw rules. Layers are concatenated in numeric order.
+      anro_iptables_ipv6_raw_rules5:
+        type: list
+        elements: str
+        default: []
+        description:
+        - Layer 5 IPV6 raw rules. Layers are concatenated in numeric order.
+      anro_iptables_ipv6_raw_rules6:
+        type: list
+        elements: str
+        default: []
+        description:
+        - Layer 6 IPV6 raw rules. Layers are concatenated in numeric order.
+      anro_iptables_ipv6_raw_rules7:
+        type: list
+        elements: str
+        default: []
+        description:
+        - Layer 7 IPV6 raw rules. Layers are concatenated in numeric order.
+      anro_iptables_ipv6_raw_rules8:
+        type: list
+        elements: str
+        default: []
+        description:
+        - Layer 8 IPV6 raw rules. Layers are concatenated in numeric order.
+      anro_iptables_ipv6_raw_rules9:
+        type: list
+        elements: str
+        default: []
+        description:
+        - Layer 9 IPV6 raw rules. Layers are concatenated in numeric order.
+      anro_iptables_ipv4_rules:
+        type: list
+        elements: str
+        default: []
+        description:
+        - Legacy v1 IPV4 filter rules. Deprecated; use anro_iptables_ipv4_filter_rules.
+      anro_iptables_ipv4_rules0:
+        type: list
+        elements: str
+        default: []
+        description:
+        - Legacy v1 layer 0 IPV4 filter rules. Deprecated; use the table-specific filter variable.
+      anro_iptables_ipv4_rules1:
+        type: list
+        elements: str
+        default: []
+        description:
+        - Legacy v1 layer 1 IPV4 filter rules. Deprecated; use the table-specific filter variable.
+      anro_iptables_ipv4_rules2:
+        type: list
+        elements: str
+        default: []
+        description:
+        - Legacy v1 layer 2 IPV4 filter rules. Deprecated; use the table-specific filter variable.
+      anro_iptables_ipv4_rules3:
+        type: list
+        elements: str
+        default: []
+        description:
+        - Legacy v1 layer 3 IPV4 filter rules. Deprecated; use the table-specific filter variable.
+      anro_iptables_ipv4_rules4:
+        type: list
+        elements: str
+        default: []
+        description:
+        - Legacy v1 layer 4 IPV4 filter rules. Deprecated; use the table-specific filter variable.
+      anro_iptables_ipv4_rules5:
+        type: list
+        elements: str
+        default: []
+        description:
+        - Legacy v1 layer 5 IPV4 filter rules. Deprecated; use the table-specific filter variable.
+      anro_iptables_ipv4_rules6:
+        type: list
+        elements: str
+        default: []
+        description:
+        - Legacy v1 layer 6 IPV4 filter rules. Deprecated; use the table-specific filter variable.
+      anro_iptables_ipv4_rules7:
+        type: list
+        elements: str
+        default: []
+        description:
+        - Legacy v1 layer 7 IPV4 filter rules. Deprecated; use the table-specific filter variable.
+      anro_iptables_ipv4_rules8:
+        type: list
+        elements: str
+        default: []
+        description:
+        - Legacy v1 layer 8 IPV4 filter rules. Deprecated; use the table-specific filter variable.
+      anro_iptables_ipv4_rules9:
+        type: list
+        elements: str
+        default: []
+        description:
+        - Legacy v1 layer 9 IPV4 filter rules. Deprecated; use the table-specific filter variable.
+      anro_iptables_ipv6_rules:
+        type: list
+        elements: str
+        default: []
+        description:
+        - Legacy v1 IPV6 filter rules. Deprecated; use anro_iptables_ipv6_filter_rules.
+      anro_iptables_ipv6_rules0:
+        type: list
+        elements: str
+        default: []
+        description:
+        - Legacy v1 layer 0 IPV6 filter rules. Deprecated; use the table-specific filter variable.
+      anro_iptables_ipv6_rules1:
+        type: list
+        elements: str
+        default: []
+        description:
+        - Legacy v1 layer 1 IPV6 filter rules. Deprecated; use the table-specific filter variable.
+      anro_iptables_ipv6_rules2:
+        type: list
+        elements: str
+        default: []
+        description:
+        - Legacy v1 layer 2 IPV6 filter rules. Deprecated; use the table-specific filter variable.
+      anro_iptables_ipv6_rules3:
+        type: list
+        elements: str
+        default: []
+        description:
+        - Legacy v1 layer 3 IPV6 filter rules. Deprecated; use the table-specific filter variable.
+      anro_iptables_ipv6_rules4:
+        type: list
+        elements: str
+        default: []
+        description:
+        - Legacy v1 layer 4 IPV6 filter rules. Deprecated; use the table-specific filter variable.
+      anro_iptables_ipv6_rules5:
+        type: list
+        elements: str
+        default: []
+        description:
+        - Legacy v1 layer 5 IPV6 filter rules. Deprecated; use the table-specific filter variable.
+      anro_iptables_ipv6_rules6:
+        type: list
+        elements: str
+        default: []
+        description:
+        - Legacy v1 layer 6 IPV6 filter rules. Deprecated; use the table-specific filter variable.
+      anro_iptables_ipv6_rules7:
+        type: list
+        elements: str
+        default: []
+        description:
+        - Legacy v1 layer 7 IPV6 filter rules. Deprecated; use the table-specific filter variable.
+      anro_iptables_ipv6_rules8:
+        type: list
+        elements: str
+        default: []
+        description:
+        - Legacy v1 layer 8 IPV6 filter rules. Deprecated; use the table-specific filter variable.
+      anro_iptables_ipv6_rules9:
+        type: list
+        elements: str
+        default: []
+        description:
+        - Legacy v1 layer 9 IPV6 filter rules. Deprecated; use the table-specific filter variable.
+      anro_iptables_host_groups:
+        type: list
+        elements: dict
+        default: []
+        options:
+          name:
+            type: str
+            required: true
+            description:
+            - Custom filter chain name.
+          ipv4:
+            type: list
+            elements: str
+            default: []
+            description:
+            - IPv4 source addresses or CIDR networks accepted by the chain.
+          ipv6:
+            type: list
+            elements: str
+            default: []
+            description:
+            - IPv6 source addresses or CIDR networks accepted by the chain.
+        description:
+        - Static source groups rendered as custom filter chains.
+      anro_iptables_ansible_host_groups:
+        type: list
+        elements: str
+        default: []
+        description:
+        - Inventory group names rendered as custom filter chains.
+      anro_iptables_ansible_host_groups_ipv4_hostvar:
+        type: str
+        default: ipv4
+        description:
+        - Host variable containing IPv4 addresses for inventory-derived chains.
+      anro_iptables_ansible_host_groups_ipv6_hostvar:
+        type: str
+        default: ipv6
+        description:
+        - Host variable containing IPv6 addresses for inventory-derived chains.
+      anro_iptables_ipset_enabled:
+        type: bool
+        default: false
+        description:
+        - Install and manage IP sets.
+      anro_iptables_ipset_command:
+        type: str
+        default: /usr/sbin/ipset
+        description:
+        - Path to the ipset command.
+      anro_iptables_ipset_hashsize:
+        type: int
+        default: 1024
+        description:
+        - Default IP set hashsize.
+      anro_iptables_ipset_maxelem:
+        type: int
+        default: 65536
+        description:
+        - Default IP set maximum number of elements.
+      anro_iptables_ipset_family:
+        type: str
+        default: inet
+        description:
+        - 'Default IP set address family: inet or inet6.'
+      anro_iptables_ipset_type:
+        type: str
+        default: hash:net
+        description:
+        - Default IP set type.
+      anro_iptables_ipset_save_file:
+        type: str
+        default: ipsets
+        description:
+        - Persistent IP set filename inside anro_iptables_config_dir.
+      anro_iptables_ipsets:
+        type: list
+        elements: dict
+        default: []
+        options:
+          name:
+            type: str
+            required: true
+            description:
+            - IP set name.
+          type:
+            type: str
+            description:
+            - IP set type; defaults to anro_iptables_ipset_type.
+          family:
+            type: str
+            description:
+            - 'Address family: inet or inet6.'
+          hashsize:
+            type: int
+            description:
+            - Hash size for this set.
+          maxelem:
+            type: int
+            description:
+            - Maximum elements for this set.
+          bucketsize:
+            type: int
+            description:
+            - Optional bucketsize supported by newer ipset versions.
+          set:
+            type: list
+            elements: str
+            required: true
+            description:
+            - Set members.
+        description:
+        - IP set definitions.
+      anro_iptables_docker_enabled:
+        type: bool
+        default: false
+        description:
+        - Manage a restrictive DOCKER-USER filter chain when Docker is installed.
+      anro_iptables_docker_restart_on_change:
+        type: bool
+        default: true
+        description:
+        - Restart a running Docker daemon after authoritative firewall changes so Docker recreates its chains.
+      anro_iptables_docker_ipv4_subnets:
+        type: list
+        elements: str
+        default:
+        - 172.17.0.0/16
+        description:
+        - IPv4 Docker subnets returned from DOCKER-USER before custom restrictions.
+      anro_iptables_docker_ipv6_subnets:
+        type: list
+        elements: str
+        default:
+        - fd00::/80
+        description:
+        - IPv6 Docker subnets returned from DOCKER-USER before custom restrictions.
+      anro_iptables_ipv4_docker_rules:
+        type: list
+        elements: str
+        default: []
+        description:
+        - Custom IPv4 DOCKER-USER rules inserted before the final DROP.
+      anro_iptables_ipv6_docker_rules:
+        type: list
+        elements: str
+        default: []
+        description:
+        - Custom IPv6 DOCKER-USER rules inserted before the final DROP.
+      anro_iptables_gateway_enable:
+        type: bool
+        default: false
+        description:
+        - Enable IPv4 and IPv6 kernel packet forwarding.
+      anro_iptables_sysctl_file:
+        type: str
+        default: /etc/sysctl.d/99-anro-iptables-forwarding.conf
+        description:
+        - Managed sysctl file for forwarding settings.

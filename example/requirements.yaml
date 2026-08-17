@@ -1,0 +1,6 @@
+---
+roles:
+  - name: anro_iptables
+    src: https://github.com/jmcnab006/anro_iptables.git
+    scm: git
+    version: main

@@ -1,58 +1,47 @@
 ---
-- name: Check if Docker service is enabled
+- name: ASSERT | Validate role inputs
+  ansible.builtin.import_tasks: assert.yaml
+  tags: [always]
+
+- name: FACTS | Gather service facts
   ansible.builtin.service_facts:
 
-- name: Set facts about Docker service status
+- name: FACTS | Record Docker state
   ansible.builtin.set_fact:
-    _docker_installed: "{{
-      ansible_facts.services['docker.service'] is defined and
-      ansible_facts.services['docker.service']['status'] == 'enabled'
-    }}"
-  when: "'docker.service' in ansible_facts.services"
+    _anro_iptables_docker_installed: "{{ 'docker.service' in ansible_facts.services }}"
+    _anro_iptables_docker_running: >-
+      {{
+        'docker.service' in ansible_facts.services
+        and ansible_facts.services['docker.service'].state == 'running'
+      }}
 
-- name: Ensure FORWARD chain is set to ACCEPT if docker is enabled
-  ansible.builtin.set_fact:
-    anro_iptables_forward_policy: accept
-  when:
-    - _docker_installed is defined
-    - _docker_installed | bool
-    - anro_iptables_docker_enabled | bool
+- name: PREPARE | Assemble effective rules
+  ansible.builtin.import_tasks: prepare.yaml
 
-- name: Install packages
+- name: ASSERT | Validate assembled rules
+  ansible.builtin.import_tasks: assert_prepared.yaml
+  tags: [always]
+
+- name: DEBUG | Show effective configuration
+  ansible.builtin.import_tasks: debug.yaml
+  when: anro_iptables_debug | bool
+
+- name: INSTALL | Install firewall packages
   ansible.builtin.import_tasks: install.yaml
-  tags:
-    - iptables
-    - iptables-install
 
-# Do our install and ipset configuration before our iptables rules and then flush handler, otherwise iptables will error with no ipset defined
-
-- name: Configure IPset
-  when:
-    - anro_iptables_ipset_enabled is defined
-    - anro_iptables_ipset_enabled
+- name: IPSET | Configure IP sets
   ansible.builtin.import_tasks: ipset.yaml
-  tags:
-    - iptables
-    - iptables-ipset
+  when: anro_iptables_ipset_enabled | bool
 
-- name: Configure IPtables
-  ansible.builtin.import_tasks: configure.yaml
-  tags:
-    - iptables
-    - iptables-configure
-
-- name: Start and enable services
-  ansible.builtin.import_tasks: service.yaml
-  tags:
-    - iptables
-    - iptables-service
-
-- name: Enable Disable gateway features
-  ansible.builtin.import_tasks: gateway.yaml
-  tags:
-    - gateway
-
-- name: Flush handlers
+- name: IPSET | Apply IP sets before firewall rules
   ansible.builtin.meta: flush_handlers
-  tags:
-    - always
+  when: anro_iptables_ipset_enabled | bool
+
+- name: CONFIGURE | Render firewall rules
+  ansible.builtin.import_tasks: configure.yaml
+
+- name: GATEWAY | Configure forwarding
+  ansible.builtin.import_tasks: gateway.yaml
+
+- name: SERVICE | Configure persistence service
+  ansible.builtin.import_tasks: service.yaml

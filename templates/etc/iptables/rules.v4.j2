@@ -1,51 +1,88 @@
 {{ ansible_managed | comment }}
-*filter
-:INPUT {{ anro_iptables_input_policy | default('ACCEPT') | upper }} [0:0]
-:FORWARD {{ anro_iptables_forward_policy | default('ACCEPT') | upper }} [0:0]
-:OUTPUT {{ anro_iptables_output_policy | default('ACCEPT') | upper }} [0:0]
+{% if _anro_iptables_ipv4_raw_rules | length > 0 %}
+*raw
+:PREROUTING ACCEPT [0:0]
+:OUTPUT ACCEPT [0:0]
+{% for rule in _anro_iptables_ipv4_raw_rules %}
+{{ rule }}
+{% endfor %}
+COMMIT
 
-{% if docker_installed | default(false) and anro_iptables_docker_enabled | default(false) %}
-:DOCKER-USER - [0:0]
 {% endif %}
+{% if _anro_iptables_ipv4_mangle_rules | length > 0 %}
+*mangle
+:PREROUTING ACCEPT [0:0]
+:INPUT ACCEPT [0:0]
+:FORWARD ACCEPT [0:0]
+:OUTPUT ACCEPT [0:0]
+:POSTROUTING ACCEPT [0:0]
+{% for rule in _anro_iptables_ipv4_mangle_rules %}
+{{ rule }}
+{% endfor %}
+COMMIT
 
+{% endif %}
+{% if _anro_iptables_ipv4_nat_rules | length > 0 %}
+*nat
+:PREROUTING ACCEPT [0:0]
+:INPUT ACCEPT [0:0]
+:OUTPUT ACCEPT [0:0]
+:POSTROUTING ACCEPT [0:0]
+{% for rule in _anro_iptables_ipv4_nat_rules %}
+{{ rule }}
+{% endfor %}
+COMMIT
+
+{% endif %}
+*filter
+:INPUT {{ anro_iptables_input_policy | upper }} [0:0]
+:FORWARD {{ anro_iptables_forward_policy | upper }} [0:0]
+:OUTPUT {{ anro_iptables_output_policy | upper }} [0:0]
 {% for group in anro_iptables_host_groups %}
 :{{ group.name | upper }} - [0:0]
 {% endfor %}
-
-{% for group in anro_iptables_ansible_host_groups %}
-:{{ group | upper }} - [0:0]
+{% for group_name in anro_iptables_ansible_host_groups %}
+{% if (group_name | upper) not in (anro_iptables_host_groups | map(attribute='name') | map('upper') | list) %}
+:{{ group_name | upper }} - [0:0]
+{% endif %}
 {% endfor %}
+{% if _anro_iptables_docker_installed | default(false) | bool and anro_iptables_docker_enabled | bool %}
+:DOCKER-USER - [0:0]
+{% endif %}
 
-{% for rule in anro_iptables_ipv4_rules %}
+{% for rule in _anro_iptables_ipv4_filter_rules %}
 {{ rule }}
 {% endfor %}
-{% if docker_installed | default(false) and anro_iptables_docker_enabled | default(false) %}
-{% if anro_iptables_ipv4_docker_rules is defined and anro_iptables_ipv4_docker_rules | length > 0 %}
+
+# Static host-group chains.
+{% for group in anro_iptables_host_groups %}
+{% for address in group.ipv4 | default([]) | flatten %}
+-A {{ group.name | upper }} -s {{ address }} -j ACCEPT
+{% endfor %}
+{% endfor %}
+
+# Inventory-derived host-group chains.
+{% for group_name in anro_iptables_ansible_host_groups %}
+{% for inventory_hostname in groups[group_name] %}
+{% set value = hostvars[inventory_hostname][anro_iptables_ansible_host_groups_ipv4_hostvar] | default([]) %}
+{% set addresses = [value] if value is string else value %}
+{% for address in addresses | flatten %}
+-A {{ group_name | upper }} -s {{ address }} -j ACCEPT
+{% endfor %}
+{% endfor %}
+{% endfor %}
+
+{% if _anro_iptables_docker_installed | default(false) | bool and anro_iptables_docker_enabled | bool %}
+# Docker's DOCKER-USER chain is evaluated before Docker forwarding rules.
 -A DOCKER-USER -i lo -j RETURN
 -A DOCKER-USER -i docker0 -j RETURN
-{% if anro_iptables_docker_ipv4_subnets is defined and anro_iptables_docker_ipv4_subnets | length > 0 %}
 {% for subnet in anro_iptables_docker_ipv4_subnets %}
 -A DOCKER-USER -s {{ subnet }} -j RETURN
 {% endfor %}
-{% endif %}
 -A DOCKER-USER -m conntrack --ctstate RELATED,ESTABLISHED -j RETURN
 {% for rule in anro_iptables_ipv4_docker_rules %}
 {{ rule }}
 {% endfor %}
-{% endif %}
 -A DOCKER-USER -j DROP
 {% endif %}
-{% for group in anro_iptables_host_groups %}
-{% for ip in group.ipv4 | flatten %}
--A {{ group.name | upper }} -s {{ ip }} -j ACCEPT
-{% endfor %}
-{% endfor %}
-{% for group in anro_iptables_ansible_host_groups %}
-{% for item in groups[group] %}
-{% if anro_iptables_ansible_host_groups_ipv4_hostvar in hostvars[item] %}
--A {{ group | upper }} -s {{ hostvars[item][anro_iptables_ansible_host_groups_ipv4_hostvar] }} -j ACCEPT
-{% endif %}
-{% endfor %}
-{% endfor %}
-
 COMMIT

@@ -1,25 +1,25 @@
 ---
-- name: INSTALL | Remove firewalld
-  ansible.builtin.package:
+- name: INSTALL | Remove firewalld to avoid competing firewall managers
+  ansible.builtin.apt:
     name: firewalld
     state: absent
+    purge: true
+  when: anro_iptables_remove_firewalld | bool
 
-- name: INSTALL | Install iptables packages
-  ansible.builtin.package:
+- name: INSTALL | Install iptables persistence packages
+  ansible.builtin.apt:
     name:
-      - netfilter-persistent
       - iptables
       - iptables-persistent
+      - netfilter-persistent
     state: present
     update_cache: true
+    cache_valid_time: 3600
 
-- name: INSTALL | Install ipset packages
-  when:
-    - anro_iptables_ipset_enabled is defined
-    - anro_iptables_ipset_enabled
-  ansible.builtin.package:
+- name: INSTALL | Install IP set packages
+  ansible.builtin.apt:
     name:
       - ipset
       - ipset-persistent
     state: present
-    update_cache: true
+  when: anro_iptables_ipset_enabled | bool
