@@ -1,0 +1,27 @@
+---
+# Docker configuration for molecule testing
+ansible_connection: community.docker.docker
+
+container_command: /lib/systemd/systemd # noqa: var-naming[no-role-prefix]
+container_privileged: true # noqa: var-naming[no-role-prefix]
+container_log_driver: json-file # noqa: var-naming[no-role-prefix]
+container_volumes: # noqa: var-naming[no-role-prefix]
+  - /sys/fs/cgroup:/sys/fs/cgroup:rw
+container_tmpfs: # noqa: var-naming[no-role-prefix]
+  - /run
+  - /tmp
+
+# Role test variables
+
+anro_iptables_debug: true
+anro_iptables_input_policy: ACCEPT
+anro_iptables_forward_policy: ACCEPT
+anro_iptables_output_policy: ACCEPT
+anro_iptables_ipv4_filter_rules1:
+  - '-A INPUT -i lo -j ACCEPT'
+anro_iptables_ipv4_nat_rules1:
+  - '-A POSTROUTING -s 192.0.2.0/24 -j MASQUERADE'
+anro_iptables_ipv4_mangle_rules1:
+  - '-A OUTPUT -p tcp --dport 443 -j MARK --set-mark 1'
+anro_iptables_ipv4_raw_rules1:
+  - '-A OUTPUT -p udp --dport 8125 -j NOTRACK'

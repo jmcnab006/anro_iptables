@@ -33,3 +33,9 @@
     - anro_iptables_docker_enabled | bool
     - anro_iptables_docker_restart_on_change | bool
     - _anro_iptables_docker_running | default(false) | bool
+
+- name: Apply kernel forwarding settings
+  ansible.builtin.command:
+    cmd: "sysctl -p {{ anro_iptables_sysctl_file }}"
+  when: _anro_iptables_forwarding_config.changed
+  changed_when: true

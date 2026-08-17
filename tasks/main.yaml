@@ -1,7 +1,8 @@
 ---
 - name: ASSERT | Validate role inputs
   ansible.builtin.import_tasks: assert.yaml
-  tags: [always]
+  tags:
+    - always
 
 - name: FACTS | Gather service facts
   ansible.builtin.service_facts:

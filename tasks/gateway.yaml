@@ -10,9 +10,5 @@
       net.ipv4.ip_forward={{ 1 if anro_iptables_gateway_enable | bool else 0 }}
       net.ipv6.conf.all.forwarding={{ 1 if anro_iptables_gateway_enable | bool else 0 }}
   register: _anro_iptables_forwarding_config
-
-- name: GATEWAY | Apply kernel forwarding settings
-  ansible.builtin.command:
-    cmd: "sysctl -p {{ anro_iptables_sysctl_file }}"
-  when: _anro_iptables_forwarding_config.changed
-  changed_when: true
+  notify:
+    - 'anro_iptables : Apply kernel forwarding settings'

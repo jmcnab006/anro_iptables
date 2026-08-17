@@ -1,0 +1,6 @@
+---
+- name: Converge
+  hosts: server
+
+  roles:
+    - role: anro_iptables # noqa: syntax-check[specific]

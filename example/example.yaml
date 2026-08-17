@@ -81,4 +81,4 @@
       - '-A DOCKER-USER -i eth0 -s 198.51.100.0/24 -p tcp --dport 8443 -j ACCEPT'
 
   roles:
-    - role: anro_iptables
+    - role: anro_iptables # noqa: syntax-check[specific]
