@@ -14,14 +14,39 @@ container_tmpfs: # noqa: var-naming[no-role-prefix]
 # Role test variables
 
 anro_iptables_debug: true
+# Keep policies permissive for Molecule.
 anro_iptables_input_policy: ACCEPT
 anro_iptables_forward_policy: ACCEPT
 anro_iptables_output_policy: ACCEPT
+
+#
+# FILTER
+#
 anro_iptables_ipv4_filter_rules1:
-  - '-A INPUT -i lo -j ACCEPT'
+  - ':MOLECULE_FILTER - [0:0]'
+  - '-A INPUT -s 172.30.0.0/24 -p icmp -j MOLECULE_FILTER'
+  - '-A MOLECULE_FILTER -j ACCEPT'
+
+#
+# NAT
+#
 anro_iptables_ipv4_nat_rules1:
-  - '-A POSTROUTING -s 192.0.2.0/24 -j MASQUERADE'
+  - ':MOLECULE_NAT - [0:0]'
+  - '-A POSTROUTING -s 172.30.0.0/24 -j MOLECULE_NAT'
+  - '-A MOLECULE_NAT -j RETURN'
+
+#
+# MANGLE
+#
 anro_iptables_ipv4_mangle_rules1:
-  - '-A OUTPUT -p tcp --dport 443 -j MARK --set-mark 1'
+  - ':MOLECULE_MANGLE - [0:0]'
+  - '-A OUTPUT -d 172.30.0.0/24 -p icmp -j MOLECULE_MANGLE'
+  - '-A MOLECULE_MANGLE -j MARK --set-mark 42'
+
+#
+# RAW
+#
 anro_iptables_ipv4_raw_rules1:
-  - '-A OUTPUT -p udp --dport 8125 -j NOTRACK'
+  - ':MOLECULE_RAW - [0:0]'
+  - '-A OUTPUT -d 172.30.0.0/24 -p icmp -j MOLECULE_RAW'
+  - '-A MOLECULE_RAW -j RETURN'

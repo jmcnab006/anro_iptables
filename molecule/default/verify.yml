@@ -5,3 +5,155 @@
   tasks:
     - name: Confirm host is reachable
       ansible.builtin.ping:
+
+    - name: VERIFY | Read IPv4 persistent firewall
+      ansible.builtin.slurp:
+        src: /etc/iptables/rules.v4
+      register: _rules_v4
+
+    - name: VERIFY | Decode IPv4 persistent firewall
+      ansible.builtin.set_fact:
+        _rules_v4_text: "{{ _rules_v4.content | b64decode }}"
+
+    - name: VERIFY | Assert all IPv4 tables were generated
+      ansible.builtin.assert:
+        that:
+          - "'*raw' in _rules_v4_text"
+          - "'*mangle' in _rules_v4_text"
+          - "'*nat' in _rules_v4_text"
+          - "'*filter' in _rules_v4_text"
+          - "':MOLECULE_RAW - [0:0]' in _rules_v4_text"
+          - "':MOLECULE_MANGLE - [0:0]' in _rules_v4_text"
+          - "':MOLECULE_NAT - [0:0]' in _rules_v4_text"
+          - "':MOLECULE_FILTER - [0:0]' in _rules_v4_text"
+
+          - name: VERIFY | Validate generated IPv4 ruleset
+            ansible.builtin.command:
+              argv:
+                - /usr/sbin/iptables-restore
+                - --test
+                - /etc/iptables/rules.v4
+            changed_when: false
+
+      - name: VERIFY | Read live filter table
+        ansible.builtin.command:
+          argv:
+            - /usr/sbin/iptables-save
+            - -t
+            - filter
+        register: _filter
+        changed_when: false
+
+      - name: VERIFY | Read live NAT table
+        ansible.builtin.command:
+          argv:
+            - /usr/sbin/iptables-save
+            - -t
+            - nat
+        register: _nat
+        changed_when: false
+
+      - name: VERIFY | Read live mangle table
+        ansible.builtin.command:
+          argv:
+            - /usr/sbin/iptables-save
+            - -t
+            - mangle
+        register: _mangle
+        changed_when: false
+
+      - name: VERIFY | Read live raw table
+        ansible.builtin.command:
+          argv:
+            - /usr/sbin/iptables-save
+            - -t
+            - raw
+        register: _raw
+        changed_when: false
+
+      - name: VERIFY | Assert filter table
+        ansible.builtin.assert:
+          that:
+            - "'MOLECULE_FILTER' in _filter.stdout"
+            - "'172.30.0.0/24' in _filter.stdout"
+
+      - name: VERIFY | Assert NAT table
+        ansible.builtin.assert:
+          that:
+            - "'MOLECULE_NAT' in _nat.stdout"
+            - "'172.30.0.0/24' in _nat.stdout"
+
+      - name: VERIFY | Assert mangle table
+        ansible.builtin.assert:
+          that:
+            - "'MOLECULE_MANGLE' in _mangle.stdout"
+            - "'MARK' in _mangle.stdout"
+
+      - name: VERIFY | Assert raw table
+        ansible.builtin.assert:
+          that:
+            - "'MOLECULE_RAW' in _raw.stdout"
+
+      - name: VERIFY | Generate test traffic from Ubuntu 22.04
+        ansible.builtin.command:
+          argv:
+            - ping
+            - -c
+            - '5'
+            - 172.30.0.24
+        changed_when: false
+        when: inventory_hostname == 'ubuntu-2204'
+
+      - name: VERIFY | Generate test traffic from Ubuntu 24.04
+        ansible.builtin.command:
+          argv:
+            - ping
+            - -c
+            - '5'
+            - 172.30.0.22
+        changed_when: false
+        when: inventory_hostname == 'ubuntu-2404'
+
+      - name: VERIFY | Read filter test chain counters
+        ansible.builtin.command:
+          argv:
+            - /usr/sbin/iptables
+            - -t
+            - filter
+            - -nvxL
+            - MOLECULE_FILTER
+        register: _filter_counters
+        changed_when: false
+
+      - name: VERIFY | Read NAT test chain counters
+        ansible.builtin.command:
+          argv:
+            - /usr/sbin/iptables
+            - -t
+            - nat
+            - -nvxL
+            - MOLECULE_NAT
+        register: _nat_counters
+        changed_when: false
+
+      - name: VERIFY | Read mangle test chain counters
+        ansible.builtin.command:
+          argv:
+            - /usr/sbin/iptables
+            - -t
+            - mangle
+            - -nvxL
+            - MOLECULE_MANGLE
+        register: _mangle_counters
+        changed_when: false
+
+      - name: VERIFY | Read raw test chain counters
+        ansible.builtin.command:
+          argv:
+            - /usr/sbin/iptables
+            - -t
+            - raw
+            - -nvxL
+            - MOLECULE_RAW
+        register: _raw_counters
+        changed_when: false
