@@ -1,6 +1,12 @@
 ---
 - name: Prepare
   hosts: all
-  gather_facts: false
+  become: true
 
-  tasks: []
+  tasks:
+    - name: PREPARE | Install test dependencies
+      ansible.builtin.apt:
+        name:
+          - iputils-ping
+        state: present
+        update_cache: true

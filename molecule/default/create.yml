@@ -1,16 +1,15 @@
-  ---
+---
 - name: Create container instances
   hosts: localhost
   gather_facts: false
   tasks:
-
-    - name: CREATE | Create a network with IPv6 and custom IPv4 IPAM config
+    - name: CREATE | Create a network with IPv6 and custom IPv4
       community.docker.docker_network:
-        name: molecule-anro-iptables
+        name: 'molecule-anro-iptables'
         enable_ipv6: true
         ipam_config:
-          - subnet: 172.30.0.0/24
-          - subnet: fdd1:ac8c:0557:7ce2::/64
+          - subnet: '172.30.0.0/24'
+          - subnet: 'fdd1:ac8c:0557:7ce2::/64'
 
     - name: CREATE | Create containers
       community.docker.docker_container:
