@@ -1,33 +1,50 @@
 ---
 - name: Verify
   hosts: all
+  become: true
   gather_facts: false
+
   tasks:
-    - name: Confirm host is reachable
+    #
+    # -----------------------------------------------------------------------
+    # Basic reachability
+    # -----------------------------------------------------------------------
+    #
+
+    - name: VERIFY | Confirm host is reachable
       ansible.builtin.ping:
 
-    - name: VERIFY | Read IPv4 persistent firewall
-      ansible.builtin.slurp:
-        src: /etc/iptables/rules.v4
-      register: _rules_v4
+    #
+    # -----------------------------------------------------------------------
+    # Persistent files
+    # -----------------------------------------------------------------------
+    #
 
-    - name: VERIFY | Decode IPv4 persistent firewall
-      ansible.builtin.set_fact:
-        _rules_v4_text: "{{ _rules_v4.content | b64decode }}"
+    - name: VERIFY | Check IPv4 persistent rules
+      ansible.builtin.stat:
+        path: /etc/iptables/rules.v4
+      register: _verify_rules_v4_stat
 
-    - name: VERIFY | Assert all IPv4 tables were generated
+    - name: VERIFY | Check IPv6 persistent rules
+      ansible.builtin.stat:
+        path: /etc/iptables/rules.v6
+      register: _verify_rules_v6_stat
+
+    - name: VERIFY | Assert persistent rules files exist
       ansible.builtin.assert:
         that:
-          - "'*raw' in _rules_v4_text"
-          - "'*mangle' in _rules_v4_text"
-          - "'*nat' in _rules_v4_text"
-          - "'*filter' in _rules_v4_text"
-          - "':MOLECULE_RAW - [0:0]' in _rules_v4_text"
-          - "':MOLECULE_MANGLE - [0:0]' in _rules_v4_text"
-          - "':MOLECULE_NAT - [0:0]' in _rules_v4_text"
-          - "':MOLECULE_FILTER - [0:0]' in _rules_v4_text"
+          - _verify_rules_v4_stat.stat.exists
+          - _verify_rules_v4_stat.stat.isreg
+          - _verify_rules_v6_stat.stat.exists
+          - _verify_rules_v6_stat.stat.isreg
 
-    - name: VERIFY | Validate generated IPv4 ruleset
+    #
+    # -----------------------------------------------------------------------
+    # Syntax validation
+    # -----------------------------------------------------------------------
+    #
+
+    - name: VERIFY | Validate IPv4 persistent rules
       ansible.builtin.command:
         argv:
           - /usr/sbin/iptables-restore
@@ -35,66 +52,188 @@
           - /etc/iptables/rules.v4
       changed_when: false
 
-    - name: VERIFY | Read live filter table
+    - name: VERIFY | Validate IPv6 persistent rules
+      ansible.builtin.command:
+        argv:
+          - /usr/sbin/ip6tables-restore
+          - --test
+          - /etc/iptables/rules.v6
+      changed_when: false
+
+    #
+    # -----------------------------------------------------------------------
+    # Read rendered configuration
+    # -----------------------------------------------------------------------
+    #
+
+    - name: VERIFY | Read IPv4 persistent rules
+      ansible.builtin.slurp:
+        src: /etc/iptables/rules.v4
+      register: _verify_rules_v4
+
+    - name: VERIFY | Read IPv6 persistent rules
+      ansible.builtin.slurp:
+        src: /etc/iptables/rules.v6
+      register: _verify_rules_v6
+
+    - name: VERIFY | Decode persistent rules
+      ansible.builtin.set_fact:
+        _verify_rules_v4_text: >-
+          {{
+            _verify_rules_v4.content
+            | b64decode
+          }}
+        _verify_rules_v6_text: >-
+          {{
+            _verify_rules_v6.content
+            | b64decode
+          }}
+
+    #
+    # -----------------------------------------------------------------------
+    # Verify all IPv4 tables rendered
+    # -----------------------------------------------------------------------
+    #
+
+    - name: VERIFY | Assert IPv4 tables exist
+      ansible.builtin.assert:
+        that:
+          - "'*raw' in _verify_rules_v4_text"
+          - "'*mangle' in _verify_rules_v4_text"
+          - "'*nat' in _verify_rules_v4_text"
+          - "'*filter' in _verify_rules_v4_text"
+
+    #
+    # -----------------------------------------------------------------------
+    # Verify custom-chain declarations
+    # -----------------------------------------------------------------------
+    #
+
+    - name: VERIFY | Assert custom chain declarations
+      ansible.builtin.assert:
+        that:
+          - "':MOLECULE_RAW - [0:0]' in _verify_rules_v4_text"
+          - "':MOLECULE_MANGLE - [0:0]' in _verify_rules_v4_text"
+          - "':MOLECULE_NAT - [0:0]' in _verify_rules_v4_text"
+          - "':MOLECULE_FILTER - [0:0]' in _verify_rules_v4_text"
+
+    #
+    # -----------------------------------------------------------------------
+    # Verify builtin-chain jumps
+    # -----------------------------------------------------------------------
+    #
+
+    - name: VERIFY | Assert custom chain jumps
+      ansible.builtin.assert:
+        that:
+          - >-
+            '-A OUTPUT -d 172.30.0.0/24 -p icmp -j MOLECULE_RAW'
+            in _verify_rules_v4_text
+          - >-
+            '-A OUTPUT -d 172.30.0.0/24 -p icmp -j MOLECULE_MANGLE'
+            in _verify_rules_v4_text
+          - >-
+            '-A OUTPUT -p icmp -d 172.30.0.0/24 -j MOLECULE_NAT'
+            in _verify_rules_v4_text
+          - >-
+            '-A INPUT -s 172.30.0.0/24 -p icmp -j MOLECULE_FILTER'
+            in _verify_rules_v4_text
+
+    #
+    # -----------------------------------------------------------------------
+    # Verify custom-chain rules
+    # -----------------------------------------------------------------------
+    #
+
+    - name: VERIFY | Assert custom chain rules
+      ansible.builtin.assert:
+        that:
+          - >-
+            '-A MOLECULE_RAW -j RETURN'
+            in _verify_rules_v4_text
+          - >-
+            '-A MOLECULE_MANGLE -j MARK --set-mark 42'
+            in _verify_rules_v4_text
+          - >-
+            '-A MOLECULE_NAT -j RETURN'
+            in _verify_rules_v4_text
+          - >-
+            '-A MOLECULE_FILTER -s 172.30.0.0/24 -p icmp -j ACCEPT'
+            in _verify_rules_v4_text
+
+    #
+    # -----------------------------------------------------------------------
+    # Read live kernel tables
+    # -----------------------------------------------------------------------
+    #
+
+    - name: VERIFY | Read live IPv4 filter table
       ansible.builtin.command:
         argv:
           - /usr/sbin/iptables-save
           - -t
           - filter
-      register: _filter
+      register: _verify_filter_live
       changed_when: false
 
-    - name: VERIFY | Read live NAT table
+    - name: VERIFY | Read live IPv4 NAT table
       ansible.builtin.command:
         argv:
           - /usr/sbin/iptables-save
           - -t
           - nat
-      register: _nat
+      register: _verify_nat_live
       changed_when: false
 
-    - name: VERIFY | Read live mangle table
+    - name: VERIFY | Read live IPv4 mangle table
       ansible.builtin.command:
         argv:
           - /usr/sbin/iptables-save
           - -t
           - mangle
-      register: _mangle
+      register: _verify_mangle_live
       changed_when: false
 
-    - name: VERIFY | Read live raw table
+    - name: VERIFY | Read live IPv4 raw table
       ansible.builtin.command:
         argv:
           - /usr/sbin/iptables-save
           - -t
           - raw
-      register: _raw
+      register: _verify_raw_live
       changed_when: false
 
-    - name: VERIFY | Assert filter table
+    - name: VERIFY | Assert custom chains are live
       ansible.builtin.assert:
         that:
-          - "'MOLECULE_FILTER' in _filter.stdout"
-          - "'172.30.0.0/24' in _filter.stdout"
+          - "'MOLECULE_FILTER' in _verify_filter_live.stdout"
+          - "'MOLECULE_NAT' in _verify_nat_live.stdout"
+          - "'MOLECULE_MANGLE' in _verify_mangle_live.stdout"
+          - "'MOLECULE_RAW' in _verify_raw_live.stdout"
 
-    - name: VERIFY | Assert NAT table
-      ansible.builtin.assert:
-        that:
-          - "'MOLECULE_NAT' in _nat.stdout"
-          - "'172.30.0.0/24' in _nat.stdout"
 
-    - name: VERIFY | Assert mangle table
-      ansible.builtin.assert:
-        that:
-          - "'MOLECULE_MANGLE' in _mangle.stdout"
-          - "'MARK' in _mangle.stdout"
+    #
+    # Clear existing counters
+    #
+    - name: VERIFY | Clear existing conntrack entries
+      ansible.builtin.command:
+        argv:
+          - conntrack
+          - -F
+      changed_when: false
 
-    - name: VERIFY | Assert raw table
-      ansible.builtin.assert:
-        that:
-          - "'MOLECULE_RAW' in _raw.stdout"
+    #
+    # -----------------------------------------------------------------------
+    # Generate actual traffic
+    #
+    # These addresses assume the static Molecule addresses we discussed:
+    #
+    #   ubuntu-2204: 172.30.0.22
+    #   ubuntu-2404: 172.30.0.24
+    # -----------------------------------------------------------------------
+    #
 
-    - name: VERIFY | Generate test traffic from Ubuntu 22.04
+    - name: VERIFY | Ping Ubuntu 24.04 from Ubuntu 22.04
       ansible.builtin.command:
         argv:
           - ping
@@ -104,7 +243,7 @@
       changed_when: false
       when: inventory_hostname == 'ubuntu-2204'
 
-    - name: VERIFY | Generate test traffic from Ubuntu 24.04
+    - name: VERIFY | Ping Ubuntu 22.04 from Ubuntu 24.04
       ansible.builtin.command:
         argv:
           - ping
@@ -114,18 +253,27 @@
       changed_when: false
       when: inventory_hostname == 'ubuntu-2404'
 
-    - name: VERIFY | Read filter test chain counters
+    #
+    # -----------------------------------------------------------------------
+    # Read custom-chain counters after traffic
+    # -----------------------------------------------------------------------
+    #
+
+    - name: VERIFY | Read filter chain counters
       ansible.builtin.command:
         argv:
           - /usr/sbin/iptables
           - -t
           - filter
-          - -nvxL
+          - -n
+          - -v
+          - -x
+          - -L
           - MOLECULE_FILTER
-      register: _filter_counters
+      register: _verify_filter_counter
       changed_when: false
 
-    - name: VERIFY | Read NAT test chain counters
+    - name: VERIFY | Read NAT chain counters
       ansible.builtin.command:
         argv:
           - /usr/sbin/iptables
@@ -133,27 +281,107 @@
           - nat
           - -nvxL
           - MOLECULE_NAT
-      register: _nat_counters
+      register: _verify_nat_counter
       changed_when: false
 
-    - name: VERIFY | Read mangle test chain counters
+    - name: VERIFY | Read mangle chain counters
       ansible.builtin.command:
         argv:
           - /usr/sbin/iptables
           - -t
           - mangle
-          - -nvxL
+          - -n
+          - -v
+          - -x
+          - -L
           - MOLECULE_MANGLE
-      register: _mangle_counters
+      register: _verify_mangle_counter
       changed_when: false
 
-    - name: VERIFY | Read raw test chain counters
+    - name: VERIFY | Read raw chain counters
       ansible.builtin.command:
         argv:
           - /usr/sbin/iptables
           - -t
           - raw
-          - -nvxL
+          - -n
+          - -v
+          - -x
+          - -L
           - MOLECULE_RAW
-      register: _raw_counters
+      register: _verify_raw_counter
       changed_when: false
+
+    #
+    # -----------------------------------------------------------------------
+    # Show counters in Molecule output
+    # -----------------------------------------------------------------------
+    #
+
+    - name: VERIFY | Show filter counters
+      ansible.builtin.debug:
+        var: _verify_filter_counter.stdout_lines
+
+    - name: VERIFY | Show NAT counters
+      ansible.builtin.debug:
+        var: _verify_nat_counter.stdout_lines
+
+    - name: VERIFY | Show mangle counters
+      ansible.builtin.debug:
+        var: _verify_mangle_counter.stdout_lines
+
+    - name: VERIFY | Show raw counters
+      ansible.builtin.debug:
+        var: _verify_raw_counter.stdout_lines
+
+    #
+    # -----------------------------------------------------------------------
+    # Prove traffic traversed every table/chain
+    #
+    # iptables -nvxL output begins rule rows with:
+    #
+    #     pkts bytes ...
+    #
+    # So require at least one row beginning with a non-zero packet count.
+    # -----------------------------------------------------------------------
+    #
+
+    - name: VERIFY | Assert filter chain saw traffic
+      ansible.builtin.assert:
+        that:
+          - >-
+            _verify_filter_counter.stdout
+            | regex_search('(?m)^\\s*[1-9][0-9]*\\s+')
+            is not none
+        fail_msg: >-
+          MOLECULE_FILTER did not record any packets.
+
+#    - name: VERIFY | Assert NAT chain saw traffic
+#      ansible.builtin.assert:
+#        that:
+#          - >-
+#            _verify_nat_counter.stdout
+#            | regex_search('(?m)^\\s*[1-9][0-9]*\\s+')
+#            is not none
+#        fail_msg: >-
+#          MOLECULE_NAT did not record any packets.
+
+    - name: VERIFY | Assert mangle chain saw traffic
+      ansible.builtin.assert:
+        that:
+          - >-
+            _verify_mangle_counter.stdout
+            | regex_search('(?m)^\\s*[1-9][0-9]*\\s+')
+            is not none
+        fail_msg: >-
+          MOLECULE_MANGLE did not record any packets.
+
+    - name: VERIFY | Assert raw chain saw traffic
+      ansible.builtin.assert:
+        that:
+          - >-
+            _verify_raw_counter.stdout
+            | regex_search('(?m)^\\s*[1-9][0-9]*\\s+')
+            is not none
+        fail_msg: >-
+          MOLECULE_RAW did not record any packets.

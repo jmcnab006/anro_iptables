@@ -140,9 +140,17 @@ anro_iptables_ipv6_rules7: []
 anro_iptables_ipv6_rules8: []
 anro_iptables_ipv6_rules9: []
 
-# Static and inventory-derived filter chains
+
+# Custom table chains
+anro_iptables_filter_chains: []
+anro_iptables_nat_chains: []
+anro_iptables_mangle_chains: []
+anro_iptables_raw_chains: []
+
+# Legacy compatibility
 anro_iptables_host_groups: []
 anro_iptables_ansible_host_groups: []
+
 anro_iptables_ansible_host_groups_ipv4_hostvar: 'ipv4'
 anro_iptables_ansible_host_groups_ipv6_hostvar: 'ipv6'
 

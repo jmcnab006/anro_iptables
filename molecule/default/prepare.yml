@@ -8,5 +8,6 @@
       ansible.builtin.apt:
         name:
           - iputils-ping
+          - conntrack
         state: present
         update_cache: true

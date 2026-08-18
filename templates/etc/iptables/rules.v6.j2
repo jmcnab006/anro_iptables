@@ -1,87 +1,135 @@
 {{ ansible_managed | comment }}
-{% if _anro_iptables_ipv6_raw_rules | length > 0 %}
+
+{#
+ # ---------------------------------------------------------------------------
+ # RAW TABLE
+ # ---------------------------------------------------------------------------
+ #}
+{% if
+  _anro_iptables_ipv6_raw_rules | length > 0
+  or _anro_iptables_ipv6_raw_chains | length > 0
+%}
 *raw
 :PREROUTING ACCEPT [0:0]
 :OUTPUT ACCEPT [0:0]
+
+{# Custom chains. #}
+{% for chain in _anro_iptables_ipv6_raw_chains %}
+:{{ chain.name | upper }} - [0:0]
+{% endfor %}
+
+{# Table rules. #}
 {% for rule in _anro_iptables_ipv6_raw_rules %}
 {{ rule }}
 {% endfor %}
+
+{# Custom chain rules. #}
+{% for chain in _anro_iptables_ipv6_raw_chains %}
+{% for rule in chain.ipv6 %}
+-A {{ chain.name | upper }} {{ rule }}
+{% endfor %}
+{% endfor %}
+
 COMMIT
 
 {% endif %}
-{% if _anro_iptables_ipv6_mangle_rules | length > 0 %}
+{#
+ # ---------------------------------------------------------------------------
+ # MANGLE TABLE
+ # ---------------------------------------------------------------------------
+ #}
+{% if
+  _anro_iptables_ipv6_mangle_rules | length > 0
+  or _anro_iptables_ipv6_mangle_chains | length > 0
+%}
 *mangle
 :PREROUTING ACCEPT [0:0]
 :INPUT ACCEPT [0:0]
 :FORWARD ACCEPT [0:0]
 :OUTPUT ACCEPT [0:0]
 :POSTROUTING ACCEPT [0:0]
+
+{# Custom chains. #}
+{% for chain in _anro_iptables_ipv6_mangle_chains %}
+:{{ chain.name | upper }} - [0:0]
+{% endfor %}
+
+{# Table rules. #}
 {% for rule in _anro_iptables_ipv6_mangle_rules %}
 {{ rule }}
 {% endfor %}
+
+{# Custom chain rules. #}
+{% for chain in _anro_iptables_ipv6_mangle_chains %}
+{% for rule in chain.ipv6 %}
+-A {{ chain.name | upper }} {{ rule }}
+{% endfor %}
+{% endfor %}
+
 COMMIT
 
 {% endif %}
-{% if _anro_iptables_ipv6_nat_rules | length > 0 %}
+{#
+ # ---------------------------------------------------------------------------
+ # NAT TABLE
+ # ---------------------------------------------------------------------------
+ #}
+{% if
+  _anro_iptables_ipv6_nat_rules | length > 0
+  or _anro_iptables_ipv6_nat_chains | length > 0
+%}
 *nat
 :PREROUTING ACCEPT [0:0]
 :INPUT ACCEPT [0:0]
 :OUTPUT ACCEPT [0:0]
 :POSTROUTING ACCEPT [0:0]
+
+{# Custom chains. #}
+{% for chain in _anro_iptables_ipv6_nat_chains %}
+:{{ chain.name | upper }} - [0:0]
+{% endfor %}
+
+{# Table rules. #}
 {% for rule in _anro_iptables_ipv6_nat_rules %}
 {{ rule }}
 {% endfor %}
+
+{# Custom chain rules. #}
+{% for chain in _anro_iptables_ipv6_nat_chains %}
+{% for rule in chain.ipv6 %}
+-A {{ chain.name | upper }} {{ rule }}
+{% endfor %}
+{% endfor %}
+
 COMMIT
 
 {% endif %}
+{#
+ # ---------------------------------------------------------------------------
+ # FILTER TABLE
+ # ---------------------------------------------------------------------------
+ #}
+
 *filter
 :INPUT {{ anro_iptables_input_policy | upper }} [0:0]
 :FORWARD {{ anro_iptables_forward_policy | upper }} [0:0]
 :OUTPUT {{ anro_iptables_output_policy | upper }} [0:0]
-{% for group in anro_iptables_host_groups %}
-:{{ group.name | upper }} - [0:0]
-{% endfor %}
-{% for group_name in anro_iptables_ansible_host_groups %}
-{% if (group_name | upper) not in (anro_iptables_host_groups | map(attribute='name') | map('upper') | list) %}
-:{{ group_name | upper }} - [0:0]
-{% endif %}
-{% endfor %}
-{% if _anro_iptables_docker_installed | default(false) | bool and anro_iptables_docker_enabled | bool %}
-:DOCKER-USER - [0:0]
-{% endif %}
 
+{# Custom chains. #}
+{% for chain in _anro_iptables_ipv6_filter_chains %}
+:{{ chain.name | upper }} - [0:0]
+{% endfor %}
+
+{# Table rules. #}
 {% for rule in _anro_iptables_ipv6_filter_rules %}
 {{ rule }}
 {% endfor %}
 
-# Static host-group chains.
-{% for group in anro_iptables_host_groups %}
-{% for address in group.ipv6 | default([]) | flatten %}
--A {{ group.name | upper }} -s {{ address }} -j ACCEPT
+{# Custom chain rules. #}
+{% for chain in _anro_iptables_ipv6_filter_chains %}
+{% for rule in chain.ipv6 %}
+-A {{ chain.name | upper }} {{ rule }}
 {% endfor %}
 {% endfor %}
 
-# Inventory-derived host-group chains.
-{% for group_name in anro_iptables_ansible_host_groups %}
-{% for inventory_hostname in groups[group_name] %}
-{% set value = hostvars[inventory_hostname][anro_iptables_ansible_host_groups_ipv6_hostvar] | default([]) %}
-{% set addresses = [value] if value is string else value %}
-{% for address in addresses | flatten %}
--A {{ group_name | upper }} -s {{ address }} -j ACCEPT
-{% endfor %}
-{% endfor %}
-{% endfor %}
-
-{% if _anro_iptables_docker_installed | default(false) | bool and anro_iptables_docker_enabled | bool %}
--A DOCKER-USER -i lo -j RETURN
--A DOCKER-USER -i docker0 -j RETURN
-{% for subnet in anro_iptables_docker_ipv6_subnets %}
--A DOCKER-USER -s {{ subnet }} -j RETURN
-{% endfor %}
--A DOCKER-USER -m conntrack --ctstate RELATED,ESTABLISHED -j RETURN
-{% for rule in anro_iptables_ipv6_docker_rules %}
-{{ rule }}
-{% endfor %}
--A DOCKER-USER -j DROP
-{% endif %}
 COMMIT

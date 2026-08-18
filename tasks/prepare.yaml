@@ -1,5 +1,11 @@
 ---
-- name: PREPARE | Assemble ipv4 filter rules
+#
+# ---------------------------------------------------------------------------
+# Assemble effective IPv4 rules
+# ---------------------------------------------------------------------------
+#
+
+- name: PREPARE | Assemble IPv4 filter rules
   ansible.builtin.set_fact:
     _anro_iptables_ipv4_filter_rules: >-
       {{
@@ -27,7 +33,7 @@
         + anro_iptables_ipv4_filter_rules
       }}
 
-- name: PREPARE | Assemble ipv4 nat rules
+- name: PREPARE | Assemble IPv4 NAT rules
   ansible.builtin.set_fact:
     _anro_iptables_ipv4_nat_rules: >-
       {{
@@ -44,7 +50,7 @@
         + anro_iptables_ipv4_nat_rules
       }}
 
-- name: PREPARE | Assemble ipv4 mangle rules
+- name: PREPARE | Assemble IPv4 mangle rules
   ansible.builtin.set_fact:
     _anro_iptables_ipv4_mangle_rules: >-
       {{
@@ -61,7 +67,7 @@
         + anro_iptables_ipv4_mangle_rules
       }}
 
-- name: PREPARE | Assemble ipv4 raw rules
+- name: PREPARE | Assemble IPv4 raw rules
   ansible.builtin.set_fact:
     _anro_iptables_ipv4_raw_rules: >-
       {{
@@ -78,7 +84,13 @@
         + anro_iptables_ipv4_raw_rules
       }}
 
-- name: PREPARE | Assemble ipv6 filter rules
+#
+# ---------------------------------------------------------------------------
+# Assemble effective IPv6 rules
+# ---------------------------------------------------------------------------
+#
+
+- name: PREPARE | Assemble IPv6 filter rules
   ansible.builtin.set_fact:
     _anro_iptables_ipv6_filter_rules: >-
       {{
@@ -106,7 +118,7 @@
         + anro_iptables_ipv6_filter_rules
       }}
 
-- name: PREPARE | Assemble ipv6 nat rules
+- name: PREPARE | Assemble IPv6 NAT rules
   ansible.builtin.set_fact:
     _anro_iptables_ipv6_nat_rules: >-
       {{
@@ -123,7 +135,7 @@
         + anro_iptables_ipv6_nat_rules
       }}
 
-- name: PREPARE | Assemble ipv6 mangle rules
+- name: PREPARE | Assemble IPv6 mangle rules
   ansible.builtin.set_fact:
     _anro_iptables_ipv6_mangle_rules: >-
       {{
@@ -140,7 +152,7 @@
         + anro_iptables_ipv6_mangle_rules
       }}
 
-- name: PREPARE | Assemble ipv6 raw rules
+- name: PREPARE | Assemble IPv6 raw rules
   ansible.builtin.set_fact:
     _anro_iptables_ipv6_raw_rules: >-
       {{
@@ -156,3 +168,206 @@
         + anro_iptables_ipv6_raw_rules9
         + anro_iptables_ipv6_raw_rules
       }}
+
+#
+# ---------------------------------------------------------------------------
+# Prepare first-class custom chains
+#
+# Public chain variables use:
+#
+#   - name: CHAIN_NAME
+#     ipv4:
+#       - '<rule body>'
+#     ipv6:
+#       - '<rule body>'
+#
+# Only chains explicitly defining a given address family are added to that
+# address family's prepared list.
+# ---------------------------------------------------------------------------
+#
+
+- name: PREPARE | Initialize prepared custom chains
+  ansible.builtin.set_fact:
+    _anro_iptables_ipv4_filter_chains: >-
+      {{
+        anro_iptables_filter_chains
+        | selectattr('ipv4', 'defined')
+        | list
+      }}
+    _anro_iptables_ipv6_filter_chains: >-
+      {{
+        anro_iptables_filter_chains
+        | selectattr('ipv6', 'defined')
+        | list
+      }}
+    _anro_iptables_ipv4_nat_chains: >-
+      {{
+        anro_iptables_nat_chains
+        | selectattr('ipv4', 'defined')
+        | list
+      }}
+    _anro_iptables_ipv6_nat_chains: >-
+      {{
+        anro_iptables_nat_chains
+        | selectattr('ipv6', 'defined')
+        | list
+      }}
+    _anro_iptables_ipv4_mangle_chains: >-
+      {{
+        anro_iptables_mangle_chains
+        | selectattr('ipv4', 'defined')
+        | list
+      }}
+    _anro_iptables_ipv6_mangle_chains: >-
+      {{
+        anro_iptables_mangle_chains
+        | selectattr('ipv6', 'defined')
+        | list
+      }}
+    _anro_iptables_ipv4_raw_chains: >-
+      {{
+        anro_iptables_raw_chains
+        | selectattr('ipv4', 'defined')
+        | list
+      }}
+    _anro_iptables_ipv6_raw_chains: >-
+      {{
+        anro_iptables_raw_chains
+        | selectattr('ipv6', 'defined')
+        | list
+      }}
+
+#
+# ---------------------------------------------------------------------------
+# Legacy static host-group compatibility
+#
+# Convert:
+#
+#   anro_iptables_host_groups:
+#     - name: PRIVATE
+#       ipv4:
+#         - 192.0.2.0/24
+#
+# Into the same internal representation as:
+#
+#   anro_iptables_filter_chains:
+#     - name: PRIVATE
+#       ipv4:
+#         - '-s 192.0.2.0/24 -j ACCEPT'
+#
+# Both IPv4 and IPv6 chain objects are created for legacy groups to preserve
+# the v1/v2 behavior where the chain itself existed for both families.
+# ---------------------------------------------------------------------------
+#
+
+- name: PREPARE | Convert static host groups to filter chains
+  ansible.builtin.set_fact:
+    _anro_iptables_ipv4_filter_chains: >-
+      {{
+        _anro_iptables_ipv4_filter_chains
+        + [
+            {
+              'name': item.name,
+              'ipv4':
+                (
+                  item.ipv4
+                  | default([])
+                  | map(
+                      'regex_replace',
+                      '^(.*)$',
+                      '-s \\1 -j ACCEPT'
+                    )
+                  | list
+                )
+            }
+          ]
+      }}
+    _anro_iptables_ipv6_filter_chains: >-
+      {{
+        _anro_iptables_ipv6_filter_chains
+        + [
+            {
+              'name': item.name,
+              'ipv6':
+                (
+                  item.ipv6
+                  | default([])
+                  | map(
+                      'regex_replace',
+                      '^(.*)$',
+                      '-s \\1 -j ACCEPT'
+                    )
+                  | list
+                )
+            }
+          ]
+      }}
+  loop: "{{ anro_iptables_host_groups }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+#
+# ---------------------------------------------------------------------------
+# Legacy inventory-derived host-group compatibility
+#
+# Inventory groups are compiled into the same private filter-chain structure.
+# ---------------------------------------------------------------------------
+#
+
+- name: PREPARE | Convert inventory groups to filter chains
+  ansible.builtin.set_fact:
+    _anro_iptables_ipv4_filter_chains: >-
+      {{
+        _anro_iptables_ipv4_filter_chains
+        + [
+            {
+              'name': item,
+              'ipv4':
+                (
+                  groups[item]
+                  | map(
+                      'extract',
+                      hostvars,
+                      anro_iptables_ansible_host_groups_ipv4_hostvar
+                    )
+                  | select('defined')
+                  | flatten
+                  | map(
+                      'regex_replace',
+                      '^(.*)$',
+                      '-s \\1 -j ACCEPT'
+                    )
+                  | list
+                )
+            }
+          ]
+      }}
+    _anro_iptables_ipv6_filter_chains: >-
+      {{
+        _anro_iptables_ipv6_filter_chains
+        + [
+            {
+              'name': item,
+              'ipv6':
+                (
+                  groups[item]
+                  | map(
+                      'extract',
+                      hostvars,
+                      anro_iptables_ansible_host_groups_ipv6_hostvar
+                    )
+                  | select('defined')
+                  | flatten
+                  | map(
+                      'regex_replace',
+                      '^(.*)$',
+                      '-s \\1 -j ACCEPT'
+                    )
+                  | list
+                )
+            }
+          ]
+      }}
+  loop: "{{ anro_iptables_ansible_host_groups }}"
+  loop_control:
+    label: "{{ item }}"

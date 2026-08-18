@@ -755,6 +755,71 @@ argument_specs:
               - IPv6 source addresses or CIDR networks accepted by the chain.
         description:
           - Static source groups rendered as custom filter chains.
+      anro_iptables_filter_chains:
+        type: list
+        elements: dict
+        default: []
+        options:
+          name:
+            type: str
+            required: true
+          ipv4:
+            type: list
+            elements: str
+            default: []
+          ipv6:
+            type: list
+            elements: str
+            default: []
+      anro_iptables_raw_chains:
+        type: list
+        elements: dict
+        default: []
+        options:
+          name:
+            type: str
+            required: true
+          ipv4:
+            type: list
+            elements: str
+            default: []
+          ipv6:
+            type: list
+            elements: str
+            default: []
+      anro_iptables_nat_chains:
+        type: list
+        elements: dict
+        default: []
+        options:
+          name:
+            type: str
+            required: true
+          ipv4:
+            type: list
+            elements: str
+            default: []
+          ipv6:
+            type: list
+            elements: str
+            default: []
+      anro_iptables_mangle_chains:
+        type: list
+        elements: dict
+        default: []
+        options:
+          name:
+            type: str
+            required: true
+          ipv4:
+            type: list
+            elements: str
+            default: []
+          ipv6:
+            type: list
+            elements: str
+            default: []
+
       anro_iptables_ansible_host_groups:
         type: list
         elements: str
