@@ -1,11 +1,19 @@
 ---
 - name: Reload ipsets
   ansible.builtin.command:
-    cmd: >-
-      {{ anro_iptables_ipset_command }} restore -exist -f
-      {{ anro_iptables_config_dir }}/{{ anro_iptables_ipset_save_file }}
+    argv:
+      - "{{ anro_iptables_ipset_command }}"
+      - restore
+      - -exist
+      - -f
+      - >-
+        {{
+          anro_iptables_config_dir
+          ~ '/'
+          ~ anro_iptables_ipset_save_file
+        }}
   register: _anro_iptables_ipset_restore
-  changed_when: _anro_iptables_ipset_restore.rc == 0
+  changed_when: true
 
 - name: Reload ipv4
   ansible.builtin.command:

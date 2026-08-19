@@ -1,9 +1,11 @@
 {{ ansible_managed | comment }}
+
 {% for ipset in anro_iptables_ipsets %}
 # {{ ipset.name }}
 create {{ ipset.name }} {{ ipset.type | default(anro_iptables_ipset_type) }} family {{ ipset.family | default(anro_iptables_ipset_family) }} hashsize {{ ipset.hashsize | default(anro_iptables_ipset_hashsize) }} maxelem {{ ipset.maxelem | default(anro_iptables_ipset_maxelem) }}{% if ipset.bucketsize is defined %} bucketsize {{ ipset.bucketsize }}{% endif %}
 flush {{ ipset.name }}
-{% for member in ipset.set | flatten %}
+{% for member in ipset.set %}
 add {{ ipset.name }} {{ member }}
 {% endfor %}
+
 {% endfor %}

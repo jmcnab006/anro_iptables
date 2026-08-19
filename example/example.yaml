@@ -1,84 +1,388 @@
 ---
-- name: Example host firewall, router NAT, packet marking, raw rules, IPSet, and Docker policy
-  hosts: all
+- name: Configure host firewall
+  hosts: firewalls
   become: true
 
   vars:
-    # A restrictive host firewall. Change these deliberately for your environment.
+    #
+    # -----------------------------------------------------------------------
+    # Site-specific values
+    #
+    # These are normal inventory/play variables used by the rules below.
+    # They are not role variables.
+    # -----------------------------------------------------------------------
+    #
+
+    firewall_wan_interface: eth0
+    firewall_lan_interface: eth1
+
+    firewall_lan_ipv4_network: 10.20.0.0/16
+    firewall_lan_ipv6_network: fd20:20::/64
+
+    #
+    # -----------------------------------------------------------------------
+    # General role configuration
+    # -----------------------------------------------------------------------
+    #
+
+    anro_iptables_debug: false
+
+    anro_iptables_ipv4_enabled: true
+    anro_iptables_ipv6_enabled: true
+
+    # This example is a router/firewall.
+    anro_iptables_gateway_enable: true
+
+    #
+    # -----------------------------------------------------------------------
+    # Filter policies
+    # -----------------------------------------------------------------------
+    #
+
+    # Default deny inbound and forwarded traffic.
+    # Permit outbound traffic unless explicitly restricted.
     anro_iptables_input_policy: DROP
     anro_iptables_forward_policy: DROP
     anro_iptables_output_policy: ACCEPT
 
-    # Layer 1: common baseline filter rules.
+    #
+    # -----------------------------------------------------------------------
+    # IP sets
+    #
+    # Keep changing address lists outside of individual iptables rules.
+    # -----------------------------------------------------------------------
+    #
+
+    anro_iptables_ipset_enabled: true
+
+    anro_iptables_ipsets:
+      # IPv4 networks permitted to administer the host.
+      - name: MGMT_V4
+        type: hash:net
+        family: inet
+        hashsize: 1024
+        maxelem: 65536
+        set:
+          - 10.10.0.0/16
+          - 192.168.50.0/24
+          - 203.0.113.25/32
+
+      # IPv6 networks permitted to administer the host.
+      - name: MGMT_V6
+        type: hash:net
+        family: inet6
+        hashsize: 1024
+        maxelem: 65536
+        set:
+          - fd10:10::/48
+          - 2001:db8:100::/48
+
+      # Example IPv4 deny list.
+      - name: BLOCKED_V4
+        type: hash:net
+        family: inet
+        hashsize: 1024
+        maxelem: 65536
+        set:
+          - 198.51.100.64/26
+          - 203.0.113.128/25
+
+      # Example IPv6 deny list.
+      - name: BLOCKED_V6
+        type: hash:net
+        family: inet6
+        hashsize: 1024
+        maxelem: 65536
+        set:
+          - 2001:db8:dead::/48
+
+    #
+    # -----------------------------------------------------------------------
+    # FILTER custom chains
+    # -----------------------------------------------------------------------
+    #
+
+    anro_iptables_filter_chains:
+      #
+      # SSH may only originate from the management IP sets.
+      #
+      - name: SSH_SOURCES
+        ipv4:
+          - '-m set --match-set MGMT_V4 src -j ACCEPT'
+          - '-j DROP'
+        ipv6:
+          - '-m set --match-set MGMT_V6 src -j ACCEPT'
+          - '-j DROP'
+
+      #
+      # Early source block list.
+      #
+      - name: BLOCKED_SOURCES
+        ipv4:
+          - '-m set --match-set BLOCKED_V4 src -j DROP'
+          - '-j RETURN'
+        ipv6:
+          - '-m set --match-set BLOCKED_V6 src -j DROP'
+          - '-j RETURN'
+
+      #
+      # Traffic forwarded from the internal network.
+      #
+      - name: LAN_FORWARD
+        ipv4:
+          - >-
+            -s {{ firewall_lan_ipv4_network }}
+            -m conntrack --ctstate NEW,ESTABLISHED,RELATED
+            -j ACCEPT
+          - '-j RETURN'
+        ipv6:
+          - >-
+            -s {{ firewall_lan_ipv6_network }}
+            -m conntrack --ctstate NEW,ESTABLISHED,RELATED
+            -j ACCEPT
+          - '-j RETURN'
+
+    #
+    # -----------------------------------------------------------------------
+    # IPv4 FILTER rules
+    #
+    # Low-numbered layers are baseline rules.
+    # Mid-numbered layers contain service/site policy.
+    # -----------------------------------------------------------------------
+    #
+
     anro_iptables_ipv4_filter_rules1:
+      # Always permit loopback.
       - '-A INPUT -i lo -j ACCEPT'
-      - '-A INPUT -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT'
+
+      # Reject malformed conntrack state early.
+      - '-A INPUT -m conntrack --ctstate INVALID -j DROP'
+
+      # Existing connections must be permitted before service rules.
+      - >-
+        -A INPUT
+        -m conntrack --ctstate ESTABLISHED,RELATED
+        -j ACCEPT
+
+      - >-
+        -A FORWARD
+        -m conntrack --ctstate ESTABLISHED,RELATED
+        -j ACCEPT
+
+      # Apply IPSet-backed source block list.
+      - '-A INPUT -j BLOCKED_SOURCES'
+
+      # ICMP is required for normal IPv4 network operation and diagnostics.
       - '-A INPUT -p icmp -j ACCEPT'
+
+    anro_iptables_ipv4_filter_rules4:
+      #
+      # SSH administration.
+      #
+      - >-
+        -A INPUT
+        -p tcp
+        --dport 22
+        -m conntrack --ctstate NEW
+        -j SSH_SOURCES
+
+      #
+      # Public web services.
+      #
+      - >-
+        -A INPUT
+        -i {{ firewall_wan_interface }}
+        -p tcp
+        --dport 80
+        -m conntrack --ctstate NEW
+        -j ACCEPT
+
+      - >-
+        -A INPUT
+        -i {{ firewall_wan_interface }}
+        -p tcp
+        --dport 443
+        -m conntrack --ctstate NEW
+        -j ACCEPT
+
+      #
+      # Example UDP syslog listener from the LAN.
+      # The raw-table example below bypasses conntrack for this traffic.
+      #
+      - >-
+        -A INPUT
+        -i {{ firewall_lan_interface }}
+        -s {{ firewall_lan_ipv4_network }}
+        -p udp
+        --dport 514
+        -j ACCEPT
+
+    anro_iptables_ipv4_filter_rules6:
+      #
+      # Permit LAN traffic to be routed outward.
+      #
+      - >-
+        -A FORWARD
+        -i {{ firewall_lan_interface }}
+        -j LAN_FORWARD
+
+    #
+    # -----------------------------------------------------------------------
+    # IPv6 FILTER rules
+    # -----------------------------------------------------------------------
+    #
 
     anro_iptables_ipv6_filter_rules1:
       - '-A INPUT -i lo -j ACCEPT'
-      - '-A INPUT -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT'
+
       - '-A INPUT -m conntrack --ctstate INVALID -j DROP'
+
+      - >-
+        -A INPUT
+        -m conntrack --ctstate ESTABLISHED,RELATED
+        -j ACCEPT
+
+      - >-
+        -A FORWARD
+        -m conntrack --ctstate ESTABLISHED,RELATED
+        -j ACCEPT
+
+      - '-A INPUT -j BLOCKED_SOURCES'
+
+      #
+      # ICMPv6 is fundamental to IPv6 operation, including neighbor
+      # discovery and path MTU discovery.
+      #
       - '-A INPUT -p ipv6-icmp -j ACCEPT'
 
-    # Layer 4: service-specific access. PRIVATE is generated below.
-    anro_iptables_ipv4_filter_rules4:
-      - '-A INPUT -p tcp --dport 22 -j PRIVATE'
-      - '-A INPUT -p tcp -m multiport --dports 80,443 -j ACCEPT'
-
     anro_iptables_ipv6_filter_rules4:
-      - '-A INPUT -p tcp --dport 22 -j PRIVATE'
-      - '-A INPUT -p tcp -m multiport --dports 80,443 -j ACCEPT'
+      - >-
+        -A INPUT
+        -p tcp
+        --dport 22
+        -m conntrack --ctstate NEW
+        -j SSH_SOURCES
 
-    # Static source groups become filter-table chains.
-    anro_iptables_host_groups:
-      - name: PRIVATE
+      - >-
+        -A INPUT
+        -i {{ firewall_wan_interface }}
+        -p tcp
+        --dport 80
+        -m conntrack --ctstate NEW
+        -j ACCEPT
+
+      - >-
+        -A INPUT
+        -i {{ firewall_wan_interface }}
+        -p tcp
+        --dport 443
+        -m conntrack --ctstate NEW
+        -j ACCEPT
+
+      - >-
+        -A INPUT
+        -i {{ firewall_lan_interface }}
+        -s {{ firewall_lan_ipv6_network }}
+        -p udp
+        --dport 514
+        -j ACCEPT
+
+    anro_iptables_ipv6_filter_rules6:
+      - >-
+        -A FORWARD
+        -i {{ firewall_lan_interface }}
+        -j LAN_FORWARD
+
+    #
+    # -----------------------------------------------------------------------
+    # NAT
+    #
+    # This example performs IPv4 masquerading for the internal network.
+    # IPv6 is routed normally and therefore does not require a NAT rule here.
+    # -----------------------------------------------------------------------
+    #
+
+    anro_iptables_nat_chains:
+      - name: LAN_EGRESS_NAT
         ipv4:
-          - 10.0.0.0/8
-          - 172.16.0.0/12
-          - 192.168.0.0/16
-        ipv6:
-          - fd00::/8
+          - >-
+            -s {{ firewall_lan_ipv4_network }}
+            -o {{ firewall_wan_interface }}
+            -j MASQUERADE
+          - '-j RETURN'
 
-    # NAT use case: route 10.20.0.0/16 through this host and masquerade it.
-    # Set this only on a gateway/router host in real inventory.
-    anro_iptables_gateway_enable: true
     anro_iptables_ipv4_nat_rules5:
-      - '-A POSTROUTING -s 10.20.0.0/16 -o eth0 -j MASQUERADE'
+      - '-A POSTROUTING -j LAN_EGRESS_NAT'
 
-    # Mangle use case: mark inbound HTTPS traffic for policy routing/QoS.
-    anro_iptables_ipv4_mangle_rules5:
-      - '-A PREROUTING -p tcp --dport 443 -j MARK --set-mark 10'
+    #
+    # -----------------------------------------------------------------------
+    # MANGLE
+    #
+    # Example: mark forwarded HTTPS traffic originating from the LAN.
+    #
+    # A routing/QoS subsystem could later consume firewall mark 0x10.
+    # -----------------------------------------------------------------------
+    #
 
-    # Raw use case: bypass conntrack for a high-volume UDP telemetry flow.
-    # Only use NOTRACK when the application and downstream filter policy are designed for it.
-    anro_iptables_ipv4_raw_rules5:
-      - '-A PREROUTING -p udp --dport 8125 -j NOTRACK'
-      - '-A OUTPUT -p udp --sport 8125 -j NOTRACK'
+    anro_iptables_mangle_chains:
+      - name: MARK_WEB
+        ipv4:
+          - '-p tcp --dport 443 -j MARK --set-mark 0x10'
+          - '-j RETURN'
+        ipv6:
+          - '-p tcp --dport 443 -j MARK --set-mark 0x10'
+          - '-j RETURN'
 
-    # IPSet use case. Rules can reference this with --match-set ADMIN_NETS src.
-    anro_iptables_ipset_enabled: true
-    anro_iptables_ipsets:
-      - name: ADMIN_NETS
-        type: hash:net
-        family: inet
-        set:
-          - 192.0.2.0/24
-          - 198.51.100.32/27
-      - name: ADMIN_NETS6
-        type: hash:net
-        family: inet6
-        set:
-          - 2001:db8:100::/48
+    anro_iptables_ipv4_mangle_rules4:
+      - >-
+        -A PREROUTING
+        -i {{ firewall_lan_interface }}
+        -s {{ firewall_lan_ipv4_network }}
+        -j MARK_WEB
 
-    anro_iptables_ipv4_filter_rules3:
-      - '-A INPUT -p tcp --dport 9100 -m set --match-set ADMIN_NETS src -j ACCEPT'
+    anro_iptables_ipv6_mangle_rules4:
+      - >-
+        -A PREROUTING
+        -i {{ firewall_lan_interface }}
+        -s {{ firewall_lan_ipv6_network }}
+        -j MARK_WEB
 
-    # Docker use case. When Docker is installed, the role manages DOCKER-USER.
-    # Custom rules are inserted before the role's final DOCKER-USER DROP.
-    anro_iptables_docker_enabled: false
-    anro_iptables_ipv4_docker_rules:
-      - '-A DOCKER-USER -i eth0 -s 198.51.100.0/24 -p tcp --dport 8443 -j ACCEPT'
+    #
+    # -----------------------------------------------------------------------
+    # RAW
+    #
+    # Example: high-volume one-way UDP syslog does not need connection
+    # tracking. CT --notrack must be applied in the raw table before normal
+    # conntrack processing.
+    # -----------------------------------------------------------------------
+    #
+
+    anro_iptables_raw_chains:
+      - name: NOTRACK_SYSLOG
+        ipv4:
+          - '-p udp --dport 514 -j CT --notrack'
+          - '-j RETURN'
+        ipv6:
+          - '-p udp --dport 514 -j CT --notrack'
+          - '-j RETURN'
+
+    anro_iptables_ipv4_raw_rules3:
+      - >-
+        -A PREROUTING
+        -i {{ firewall_lan_interface }}
+        -s {{ firewall_lan_ipv4_network }}
+        -p udp
+        --dport 514
+        -j NOTRACK_SYSLOG
+
+    anro_iptables_ipv6_raw_rules3:
+      - >-
+        -A PREROUTING
+        -i {{ firewall_lan_interface }}
+        -s {{ firewall_lan_ipv6_network }}
+        -p udp
+        --dport 514
+        -j NOTRACK_SYSLOG
 
   roles:
     - role: anro_iptables # noqa: syntax-check[specific]

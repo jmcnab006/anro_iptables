@@ -1,18 +1,19 @@
 ---
-- name: IPSET | Ensure configuration directory exists
-  ansible.builtin.file:
-    path: "{{ anro_iptables_config_dir }}"
-    state: directory
-    owner: root
-    group: root
-    mode: '0755'
-
-- name: IPSET | Render persistent IP set configuration
+- name: IPSET | Create persistent IPset configuration
   ansible.builtin.template:
     src: etc/iptables/ipsets.j2
-    dest: "{{ anro_iptables_config_dir }}/{{ anro_iptables_ipset_save_file }}"
+    dest: >-
+      {{
+        anro_iptables_config_dir
+        ~ '/'
+        ~ anro_iptables_ipset_save_file
+      }}
     owner: root
     group: root
-    mode: '0600'
-    backup: true
-  notify: Reload ipsets
+    mode: '0644'
+  become: true
+  notify:
+    - Reload ipsets
+
+- name: IPSET | Flush handlers
+  ansible.builtin.meta: flush_handlers
