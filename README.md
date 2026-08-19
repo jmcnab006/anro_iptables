@@ -1,21 +1,59 @@
+---
+
 # ANsible ROle iptables
 
-`anro_iptables` builds and applies persistent IPv4 and IPv6 `iptables-restore` rulesets on Debian and Ubuntu. It supports the `filter`, `nat`, `mangle`, and `raw` tables, layered Ansible variables, static and inventory-derived filter chains, optional IP sets, Docker `DOCKER-USER` policy, and kernel forwarding for gateway hosts.
+`anro_iptables` is an Ansible role for building and managing persistent Linux `iptables` firewall configurations on Debian and Ubuntu systems.
 
-The role renders complete `/etc/iptables/rules.v4` and `/etc/iptables/rules.v6` files, validates them with `iptables-restore --test` / `ip6tables-restore --test`, applies them, and relies on `netfilter-persistent` at boot.
+It provides a declarative firewall model that compiles structured Ansible variables into deterministic `iptables-restore` and `ip6tables-restore` configurations.
+
+---
+
+## Features
+
+The role manages complete IPv4 and IPv6 firewall stacks with support for:
+
+* `filter`, `nat`, `mangle`, and `raw` tables
+* Stateful firewalling using connection tracking
+* Layered rule definitions (inventory-friendly design)
+* First-class custom chains per table
+* Persistent IP sets (`ipset`)
+* Gateway / router mode with forwarding support
+* Kernel sysctl management for forwarding
+* Docker-aware firewall reconciliation (service restart model)
+* Pre-apply validation using `iptables-restore --test`
+* Molecule-based integration testing (Docker + systemd containers)
+
+---
 
 ## Requirements
 
-- Debian or Ubuntu
-- systemd
-- privilege escalation (`become: true`)
-- Ansible 2.12 or newer
+Target systems must be:
 
-The role installs `iptables`, `iptables-persistent`, and `netfilter-persistent`. When IP sets are enabled it also installs `ipset` and `ipset-persistent`.
+* Debian or Ubuntu based
+* Using `systemd`
+* Accessible via privilege escalation (`become: true`)
+* Running Ansible 2.12+
 
-## Install with `requirements.yaml`
+The role installs:
 
-Add the role to your project requirements file:
+```text
+iptables
+iptables-persistent
+netfilter-persistent
+```
+
+When IP sets are enabled:
+
+```text
+ipset
+ipset-persistent
+```
+
+`firewalld` is removed to avoid conflicting firewall managers.
+
+---
+
+## Installation
 
 ```yaml
 ---
@@ -26,28 +64,288 @@ roles:
     version: main
 ```
 
-For production, pin `version` to a tested release tag or commit rather than `main`.
-
-Install it with:
+Install:
 
 ```bash
 ansible-galaxy role install -r requirements.yaml
 ```
 
-A ready-to-copy file is included at `example/requirements.yaml`.
+> Production usage should pin to a release tag or commit SHA.
 
-## Minimal use
+---
+
+## Minimal Example
 
 ```yaml
 ---
-- name: Configure host firewall
+- name: Configure firewall
   hosts: all
   become: true
+
+  vars:
+    anro_iptables_input_policy: DROP
+    anro_iptables_forward_policy: DROP
+    anro_iptables_output_policy: ACCEPT
+
+    anro_iptables_ipv4_filter_rules1:
+      - '-A INPUT -i lo -j ACCEPT'
+      - '-A INPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT'
+      - '-A INPUT -m conntrack --ctstate INVALID -j DROP'
+      - '-A INPUT -p icmp -j ACCEPT'
+
+    anro_iptables_ipv6_filter_rules1:
+      - '-A INPUT -i lo -j ACCEPT'
+      - '-A INPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT'
+      - '-A INPUT -m conntrack --ctstate INVALID -j DROP'
+      - '-A INPUT -p ipv6-icmp -j ACCEPT'
+
+    anro_iptables_ipv4_filter_rules4:
+      - '-A INPUT -p tcp --dport 22 -m conntrack --ctstate NEW -j ACCEPT'
+
+    anro_iptables_ipv6_filter_rules4:
+      - '-A INPUT -p tcp --dport 22 -m conntrack --ctstate NEW -j ACCEPT'
+
   roles:
-    - role: anro_iptables
+    - anro_iptables
 ```
 
-The default filter policies are `ACCEPT`. Define a restrictive policy explicitly when that is what you intend:
+---
+
+# Configuration Model
+
+The role compiles firewall state through a deterministic pipeline:
+
+```text
+Ansible variables
+      ↓
+normalization / preparation layer
+      ↓
+rendered rules.v4 / rules.v6
+      ↓
+iptables-restore / ip6tables-restore
+```
+
+All transformation logic is handled internally before rendering.
+
+---
+
+# Rule Tables
+
+Supported tables:
+
+* `filter`
+* `nat`
+* `mangle`
+* `raw`
+
+The `filter` table is always rendered.
+
+Other tables are rendered only when required.
+
+---
+
+# Layered Rule System
+
+Rules can be defined in ordered layers:
+
+```yaml
+anro_iptables_ipv4_filter_rules0: []
+anro_iptables_ipv4_filter_rules1: []
+...
+anro_iptables_ipv4_filter_rules9: []
+```
+
+Plus a direct list:
+
+```yaml
+anro_iptables_ipv4_filter_rules: []
+```
+
+Execution order:
+
+```text
+0 → 1 → 2 → ... → 9 → direct rules
+```
+
+This enables clean inventory layering:
+
+```yaml
+# group_vars/all/firewall.yml
+anro_iptables_ipv4_filter_rules1:
+  - '-A INPUT -i lo -j ACCEPT'
+  - '-A INPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT'
+```
+
+```yaml
+# group_vars/web/firewall.yml
+anro_iptables_ipv4_filter_rules4:
+  - '-A INPUT -p tcp --dport 80 -j ACCEPT'
+  - '-A INPUT -p tcp --dport 443 -j ACCEPT'
+```
+
+---
+
+# Custom Chains
+
+Custom chains are defined per table:
+
+```yaml
+anro_iptables_filter_chains: []
+anro_iptables_nat_chains: []
+anro_iptables_mangle_chains: []
+anro_iptables_raw_chains: []
+```
+
+Example:
+
+```yaml
+anro_iptables_filter_chains:
+  - name: SSH_SOURCES
+
+    ipv4:
+      - '-s 10.20.0.0/16 -j ACCEPT'
+      - '-j DROP'
+
+    ipv6:
+      - '-s fd20:20::/64 -j ACCEPT'
+      - '-j DROP'
+```
+
+Chains are **definitions only**.
+
+They must be referenced explicitly in rules:
+
+```yaml
+anro_iptables_ipv4_filter_rules4:
+  - '-A INPUT -p tcp --dport 22 -j SSH_SOURCES'
+```
+
+---
+
+## NAT Example
+
+```yaml
+anro_iptables_gateway_enable: true
+
+anro_iptables_nat_chains:
+  - name: LAN_NAT
+    ipv4:
+      - '-s 10.20.0.0/16 -o eth0 -j MASQUERADE'
+      - '-j RETURN'
+
+anro_iptables_ipv4_nat_rules5:
+  - '-A POSTROUTING -j LAN_NAT'
+```
+
+---
+
+## Mangle Example
+
+```yaml
+anro_iptables_mangle_chains:
+  - name: MARK_WEB
+    ipv4:
+      - '-p tcp --dport 443 -j MARK --set-mark 0x10'
+      - '-j RETURN'
+
+anro_iptables_ipv4_mangle_rules4:
+  - '-A PREROUTING -i eth1 -j MARK_WEB'
+```
+
+---
+
+## Raw Example
+
+```yaml
+anro_iptables_raw_chains:
+  - name: NOTRACK_SYSLOG
+    ipv4:
+      - '-p udp --dport 514 -j CT --notrack'
+      - '-j RETURN'
+
+anro_iptables_ipv4_raw_rules3:
+  - '-A PREROUTING -i eth1 -p udp --dport 514 -j NOTRACK_SYSLOG'
+```
+
+---
+
+# IP Sets
+
+Enable IP sets:
+
+```yaml
+anro_iptables_ipset_enabled: true
+```
+
+Define sets:
+
+```yaml
+anro_iptables_ipsets:
+  - name: MGMT_V4
+    type: hash:net
+    family: inet
+    set:
+      - 10.10.0.0/16
+      - 192.168.50.0/24
+
+  - name: MGMT_V6
+    type: hash:net
+    family: inet6
+    set:
+      - fd10:10::/48
+```
+
+Defaults:
+
+```yaml
+anro_iptables_ipset_hashsize: 1024
+anro_iptables_ipset_maxelem: 65536
+anro_iptables_ipset_family: inet
+anro_iptables_ipset_type: hash:net
+```
+
+Use in rules:
+
+```yaml
+anro_iptables_filter_chains:
+  - name: SSH_SOURCES
+    ipv4:
+      - '-m set --match-set MGMT_V4 src -j ACCEPT'
+      - '-j DROP'
+```
+
+IP sets are restored before firewall rules are applied.
+
+---
+
+# IPv4 / IPv6 Control
+
+```yaml
+anro_iptables_ipv4_enabled: true
+anro_iptables_ipv6_enabled: true
+```
+
+Disabling a family removes its persistent rules file.
+
+---
+
+# Filter Policies
+
+```yaml
+anro_iptables_input_policy: ACCEPT
+anro_iptables_forward_policy: ACCEPT
+anro_iptables_output_policy: ACCEPT
+```
+
+Valid values:
+
+```text
+ACCEPT
+DROP
+QUEUE
+```
+
+Typical hardened setup:
 
 ```yaml
 anro_iptables_input_policy: DROP
@@ -55,180 +353,212 @@ anro_iptables_forward_policy: DROP
 anro_iptables_output_policy: ACCEPT
 ```
 
-## Rule model
+---
 
-Rules are organized by address family, table, and layer:
-
-```text
-anro_iptables_<ipv4|ipv6>_<filter|nat|mangle|raw>_rules<0-9>
-```
-
-Layers are concatenated from `0` through `9`. A direct, non-numbered list is appended after the numbered lists for that table. This makes it possible to place shared baseline rules in `group_vars/all`, service rules in group variables, host exceptions in `host_vars`, and final rules in a later layer without copying the full ruleset.
-
-Example:
-
-```yaml
-# group_vars/all/firewall.yaml
-anro_iptables_ipv4_filter_rules1:
-  - '-A INPUT -i lo -j ACCEPT'
-  - '-A INPUT -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT'
-
-# group_vars/web/firewall.yaml
-anro_iptables_ipv4_filter_rules4:
-  - '-A INPUT -p tcp -m multiport --dports 80,443 -j ACCEPT'
-```
-
-The `filter` table is always rendered. `raw`, `mangle`, and `nat` are rendered only when their effective rule list is non-empty. Tables are emitted in `raw`, `mangle`, `nat`, `filter` order.
-
-### NAT
+# Gateway Mode
 
 ```yaml
 anro_iptables_gateway_enable: true
-anro_iptables_ipv4_nat_rules5:
-  - '-A POSTROUTING -s 10.20.0.0/16 -o eth0 -j MASQUERADE'
 ```
 
-### Mangle
+Enables kernel forwarding via:
 
-```yaml
-anro_iptables_ipv4_mangle_rules5:
-  - '-A PREROUTING -p tcp --dport 443 -j MARK --set-mark 10'
+```text
+/etc/sysctl.d/99-anro-iptables-forwarding.conf
 ```
 
-### Raw
+---
 
-```yaml
-anro_iptables_ipv4_raw_rules5:
-  - '-A PREROUTING -p udp --dport 8125 -j NOTRACK'
-  - '-A OUTPUT -p udp --sport 8125 -j NOTRACK'
-```
+# Docker Behavior
 
-Rules are inserted verbatim into the selected table. Custom chains for `nat`, `mangle`, or `raw` can therefore be declared directly in the rule list:
+Docker is not directly managed by firewall rules.
 
-```yaml
-anro_iptables_ipv4_nat_rules3:
-  - ':WEB_DNAT - [0:0]'
-  - '-A PREROUTING -p tcp --dport 8443 -j WEB_DNAT'
-  - '-A WEB_DNAT -j DNAT --to-destination 10.20.30.40:443'
-```
-
-## Filter host groups
-
-Static host groups create custom chains in the `filter` table. Matching source addresses are accepted by the generated chain; traffic that does not match returns to the calling chain.
-
-```yaml
-anro_iptables_host_groups:
-  - name: PRIVATE
-    ipv4:
-      - 10.0.0.0/8
-      - 192.168.0.0/16
-    ipv6:
-      - fd00::/8
-
-anro_iptables_ipv4_filter_rules4:
-  - '-A INPUT -p tcp --dport 22 -j PRIVATE'
-```
-
-Either address family may be omitted from a host group.
-
-Inventory groups can also become filter chains:
-
-```yaml
-anro_iptables_ansible_host_groups:
-  - monitoring
-  - database
-```
-
-By default the role reads `ipv4` and `ipv6` host variables from each member. Override these names with `anro_iptables_ansible_host_groups_ipv4_hostvar` and `anro_iptables_ansible_host_groups_ipv6_hostvar`.
-
-## IP sets
-
-Enable IP sets and define them with `anro_iptables_ipsets`:
-
-```yaml
-anro_iptables_ipset_enabled: true
-anro_iptables_ipsets:
-  - name: ADMIN_NETS
-    type: hash:net
-    family: inet
-    set:
-      - 192.0.2.0/24
-      - 198.51.100.32/27
-
-anro_iptables_ipv4_filter_rules3:
-  - '-A INPUT -p tcp --dport 9100 -m set --match-set ADMIN_NETS src -j ACCEPT'
-```
-
-The role creates or updates only the declared sets. It does not globally flush unrelated IP sets. Each declared set is flushed and repopulated before firewall rules are applied.
-
-## Docker
-
-Set `anro_iptables_docker_enabled: true` to manage a restrictive `DOCKER-USER` chain when Docker is installed. The role adds local/Docker subnet and established-connection returns, then your custom rules, then a final `DROP`.
+Instead, when enabled:
 
 ```yaml
 anro_iptables_docker_enabled: true
-anro_iptables_ipv4_docker_rules:
-  - '-A DOCKER-USER -i eth0 -s 198.51.100.0/24 -p tcp --dport 8443 -j ACCEPT'
 ```
 
-With the default authoritative restore behavior, a running Docker daemon is restarted after firewall changes so Docker can recreate its own dynamically managed chains. Disable that with `anro_iptables_docker_restart_on_change: false` only when you have another reconciliation mechanism.
-
-## Gateway forwarding
+Docker is restarted after firewall changes to allow it to rebuild its internal rules.
 
 ```yaml
-anro_iptables_gateway_enable: true
+anro_iptables_docker_restart_on_change: true
 ```
 
-This manages IPv4 and IPv6 forwarding in `/etc/sysctl.d/99-anro-iptables-forwarding.conf`.
+---
 
-## Restore behavior
-
-`anro_iptables_restore_noflush` defaults to `false`. The tables present in the generated rules file are therefore authoritative when restored. This avoids stale Ansible-managed rules surviving after they are removed from inventory.
-
-Set the following only when this role must deliberately merge with another iptables manager:
+# Restore Behavior
 
 ```yaml
-anro_iptables_restore_noflush: true
+anro_iptables_restore_noflush: false
 ```
 
-Be aware that `--noflush` changes ownership semantics and can leave pre-existing rules in place.
-
-## IPv4 / IPv6 control
-
-Both families are managed by default:
+When enabled:
 
 ```yaml
-anro_iptables_ipv4_enabled: true
-anro_iptables_ipv6_enabled: true
+--noflush
 ```
 
-If a family is disabled, its persistent rules file is removed so `netfilter-persistent` cannot reload a stale role-managed configuration at boot.
+is passed to restore commands.
 
-## Compatibility with the original role
+---
 
-The original filter variables remain supported:
+# Persistent Files
+
+Default paths:
 
 ```text
-anro_iptables_ipv4_rules
-anro_iptables_ipv4_rules0 .. anro_iptables_ipv4_rules9
-anro_iptables_ipv6_rules
-anro_iptables_ipv6_rules0 .. anro_iptables_ipv6_rules9
+/etc/iptables/rules.v4
+/etc/iptables/rules.v6
+/etc/iptables/ipsets
 ```
 
-They are treated as legacy `filter` inputs and are assembled before the new `*_filter_rules*` variables. New configurations should use the table-specific names.
+Configurable via:
 
-The inconsistent `anro_iptables_ipset_sets` spelling is not retained. The supported variable is `anro_iptables_ipsets`, matching the defaults and argument specification.
+```yaml
+anro_iptables_config_dir
+anro_iptables_ipv4_save_file
+anro_iptables_ipv6_save_file
+anro_iptables_ipset_save_file
+```
 
-## Validation and safety
+---
 
-Before changing firewall files, the role validates platform assumptions and key variable structures. Rendered IPv4 and IPv6 files are validated with the corresponding restore command using `--test` before installation.
+# Validation
 
-Firewall changes can disconnect remote systems even when syntax is valid. Test restrictive policy, NAT, raw-table `NOTRACK`, Docker policy, and forwarding behavior in a recoverable environment before broad deployment.
+Before applying changes:
 
-## Full example
+* `iptables-restore --test`
+* `ip6tables-restore --test`
+* internal schema validation
+* chain and rule normalization checks
 
-See `example/example.yaml` for filter, NAT, mangle, raw, IPSet, Docker, and gateway examples.
+---
 
-## Variable reference
+# Full Example
 
-`meta/argument_specs.yaml` is the authoritative list of supported public variables and their types.
+See:
+
+```text
+example/example.yaml
+```
+
+---
+
+# Variable Reference
+
+Authoritative schema:
+
+```text
+meta/argument_specs.yaml
+```
+
+Defaults:
+
+```text
+defaults/main.yaml
+```
+
+---
+
+# Molecule Testing
+
+The role includes a Docker-based Molecule scenario.
+
+## Prerequisites
+
+* Docker
+* Python 3
+* virtualenv support
+
+---
+
+## Setup
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+```
+
+Install tooling:
+
+```bash
+pip install ansible-core ansible-lint molecule docker
+```
+
+Install collections:
+
+```bash
+ansible-galaxy collection install -r molecule/default/requirements.yml
+```
+
+---
+
+## Run Tests
+
+Full test:
+
+```bash
+molecule test -s default
+```
+
+Individual steps:
+
+```bash
+molecule create -s default
+molecule converge -s default
+molecule verify -s default
+molecule destroy -s default
+```
+
+Idempotence:
+
+```bash
+molecule idempotence -s default
+```
+
+---
+
+## Test Coverage
+
+* Ubuntu 22.04
+* Ubuntu 24.04
+* IPv4/IPv6 rules
+* custom chains
+* IP sets
+* NAT / mangle / raw tables
+* systemd-based persistence
+* iptables-restore validation
+* idempotence
+
+---
+
+# Development Workflow
+
+```bash
+ansible-lint .
+
+molecule converge -s default
+molecule idempotence -s default
+molecule verify -s default
+```
+
+Full run:
+
+```bash
+molecule test -s default
+```
+
+---
+
+# License
+
+See `LICENSE`.
+
+---
+
+If you want next step, I can also:
+
+* tighten the README into a **Galaxy-ready documentation style**
+* or generate a **docs/ site (MkDocs or Sphinx) from this structure**
+* or align `argument_specs.yaml` perfectly with this README so they are 1:1 consistent
