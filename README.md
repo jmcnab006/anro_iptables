@@ -1,4 +1,3 @@
----
 
 # ANsible ROle iptables
 
